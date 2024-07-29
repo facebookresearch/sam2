@@ -1,0 +1,113 @@
+# @package _global_
+
+# Model
+model:
+  _target_: sam2.modeling.sam2_base.SAM2Base
+  image_encoder:
+    _target_: sam2.modeling.backbones.image_encoder.ImageEncoder
+    scalp: 1
+    trunk:
+      _target_: sam2.modeling.backbones.hieradet.Hiera
+      embed_dim: 112
+      num_heads: 2
+    neck:
+      _target_: sam2.modeling.backbones.image_encoder.FpnNeck
+      position_encoding:
+        _target_: sam2.modeling.position_encoding.PositionEmbeddingSine
+        num_pos_feats: 256
+        normalize: true
+        scale: null
+        temperature: 10000
+      d_model: 256
+      backbone_channel_list: [896, 448, 224, 112]
+      fpn_top_down_levels: [2, 3]  # output level 0 and 1 directly use the backbone features
+      fpn_interp_model: nearest
+
+  memory_attention:
+    _target_: sam2.modeling.memory_attention.MemoryAttention
+    d_model: 256
+    pos_enc_at_input: true
+    layer:
+      _target_: sam2.modeling.memory_attention.MemoryAttentionLayer
+      activation: relu
+      dim_feedforward: 2048
+      dropout: 0.1
+      pos_enc_at_attn: false
+      self_attention:
+        _target_: sam2.modeling.sam.transformer.RoPEAttention
+        rope_theta: 10000.0
+        feat_sizes: [32, 32]
+        embedding_dim: 256
+        num_heads: 1
+        downsample_rate: 1
+        dropout: 0.1
+      d_model: 256
+      pos_enc_at_cross_attn_keys: true
+      pos_enc_at_cross_attn_queries: false
+      cross_attention:
+        _target_: sam2.modeling.sam.transformer.RoPEAttention
+        rope_theta: 10000.0
+        feat_sizes: [32, 32]
+        rope_k_repeat: True
+        embedding_dim: 256
+        num_heads: 1
+        downsample_rate: 1
+        dropout: 0.1
+        kv_in_dim: 64
+    num_layers: 4
+
+  memory_encoder:
+      _target_: sam2.modeling.memory_encoder.MemoryEncoder
+      out_dim: 64
+      position_encoding:
+        _target_: sam2.modeling.position_encoding.PositionEmbeddingSine
+        num_pos_feats: 64
+        normalize: true
+        scale: null
+        temperature: 10000
+      mask_downsampler:
+        _target_: sam2.modeling.memory_encoder.MaskDownSampler
+        kernel_size: 3
+        stride: 2
+        padding: 1
+      fuser:
+        _target_: sam2.modeling.memory_encoder.Fuser
+        layer:
+          _target_: sam2.modeling.memory_encoder.CXBlock
+          dim: 256
+          kernel_size: 7
+          padding: 3
+          layer_scale_init_value: 1e-6
+          use_dwconv: True  # depth-wise convs
+        num_layers: 2
+
+  num_maskmem: 7
+  image_size: 1024
+  # apply scaled sigmoid on mask logits for memory encoder, and directly feed input mask as output mask
+  sigmoid_scale_for_mem_enc: 20.0
+  sigmoid_bias_for_mem_enc: -10.0
+  use_mask_input_as_output_without_sam: true
+  # Memory
+  directly_add_no_mem_embed: true
+  # use high-resolution feature map in the SAM mask decoder
+  use_high_res_features_in_sam: true
+  # output 3 masks on the first click on initial conditioning frames
+  multimask_output_in_sam: true
+  # SAM heads
+  iou_prediction_use_sigmoid: True
+  # cross-attend to object pointers from other frames (based on SAM output tokens) in the encoder
+  use_obj_ptrs_in_encoder: true
+  add_tpos_enc_to_obj_ptrs: false
+  only_obj_ptrs_in_the_past_for_eval: true
+  # object occlusion prediction
+  pred_obj_scores: true
+  pred_obj_scores_mlp: true
+  fixed_no_obj_ptr: true
+  # multimask tracking settings
+  multimask_output_for_tracking: true
+  use_multimask_token_for_obj_ptr: true
+  multimask_min_pt_num: 0
+  multimask_max_pt_num: 1
+  use_mlp_for_obj_ptr_proj: true
+  # Compilation flag
+  compile_image_encoder: False

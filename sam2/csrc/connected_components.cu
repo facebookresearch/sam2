@@ -223,8 +223,8 @@ std::vector<torch::Tensor> get_connected_componnets(
   const uint32_t W = inputs.size(3);
 
   AT_ASSERTM(C == 1, "inputs must be [N, 1, H, W] shape");
-  AT_ASSERTM((H % 2) == 0, "height must be a even number");
-  AT_ASSERTM((W % 2) == 0, "width must be a even number");
+  AT_ASSERTM((H % 2) == 0, "height must be an even number");
+  AT_ASSERTM((W % 2) == 0, "width must be an even number");
 
   // label must be uint32_t
   auto label_options =

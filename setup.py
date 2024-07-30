@@ -26,7 +26,7 @@ REQUIRED_PACKAGES = [
     "torchvision>=0.16.1",
     "numpy>=1.24.4",
     "tqdm>=4.66.1",
-    "hydra-core>=1.3.2",
+    "hydra-core>=1.3.0",
     "iopath>=0.1.10",
     "pillow>=9.4.0",
 ]

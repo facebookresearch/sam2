@@ -36,7 +36,8 @@ First, we need to download a model checkpoint. All the model checkpoints can be 
 
 ```bash
 cd checkpoints
-./download_ckpts.sh
+./download_ckpts.sh # on Unix
+./download_ckpts.ps1 # on Windows
 ```
 
 or individually from:

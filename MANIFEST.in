@@ -1,2 +1,0 @@
-include sam2/sam2_configs/*.yaml
-include sam2/sam2_configs/__init__.py

@@ -250,7 +250,7 @@ def main():
         action="store_true",
         help="whether to use all available PNG files in input_mask_dir "
         "(default without this flag: just the first PNG file as input to the SAM 2 model; "
-        "usually we don't need this flag, since semi-supervised VOS evalaution usually takes input from the first frame only)",
+        "usually we don't need this flag, since semi-supervised VOS evaluation usually takes input from the first frame only)",
     )
     parser.add_argument(
         "--per_obj_png_file",

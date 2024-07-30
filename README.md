@@ -12,6 +12,26 @@
 
 ![SA-V dataset](assets/sa_v_dataset.jpg?raw=true)
 
+## Custom fix and installatino
+
+SAM has a custom cuda connected components implementation that has to be compiled with the same torch and cuda as the one you would use.
+There are several problems with it:
+ - we use a custom compiled torch with a specific cuda version (not the one SAM-2 wants)
+ - pip uses different mechanism for downloading build-time dependencies needed to build that cuda connected components function. It very clumsy to specify it correctly. Even after I made it build, I still got a symbols errors during runtime. So we just replaced it with opencv connected components funciton and removed the cuda part.
+
+Here is how to install it.
+```
+python3.9 -m venv env
+source env/bin/activate
+pip install --upgrade pip
+pip install torch==2.1.2 torchvision==0.16.2 --index-url https://download.pytorch.org/whl/cu118
+pip install -e ".[demo]"
+
+cd checkpoints
+./download_ckpts.sh
+jupyter notebook --notebook-dir=$(pwd) --port=8894 --no-browser --ip=0.0.0.0
+```
+
 ## Installation
 
 Please install SAM 2 on a GPU machine using:

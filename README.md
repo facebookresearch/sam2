@@ -106,7 +106,7 @@ Please refer to the examples in [video_predictor_example.ipynb](./notebooks/vide
 
 \* Compile the model by setting `compile_image_encoder: True` in the config.
 
-## Segment Aything Video Dataset
+## Segment Anything Video Dataset
 
 See [sav_dataset/README.md](sav_dataset/README.md) for details.
 

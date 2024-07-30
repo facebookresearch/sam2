@@ -212,6 +212,10 @@ class SyncedVideoStreamLoader:
             timestamp = index / self.video_fps
             self.video_stream = self.video_stream.seek(timestamp)
             img_dict = self.video_stream.__next__()
+            while abs(timestamp - img_dict['pts']) > (1 / self.video_fps):
+                print("seeking...")
+                img_dict = self.video_stream.__next__()
+
 
         self.index = index
 

@@ -94,25 +94,18 @@ def mask_to_box(masks: torch.Tensor):
 def _load_img_as_tensor(img_path, image_size):
     img_pil = Image.open(img_path)
     img_np = np.array(img_pil.convert("RGB").resize((image_size, image_size)))
-    print(img_np)
     if img_np.dtype == np.uint8:  # np.uint8 is expected for JPEG images
         img_np = img_np / 255.0
     else:
         raise RuntimeError(f"Unknown image dtype: {img_np.dtype} on {img_path}")
-    print(img_np)
     img = torch.from_numpy(img_np).permute(2, 0, 1)
     video_width, video_height = img_pil.size  # the original video size
     return img, video_height, video_width
 
 def _resize_img_tensor(img: torch.Tensor, image_size):
-    print(img.shape)
-    print(img)
     video_height, video_width = img.shape[1:]
     transform = Resize((image_size, image_size))
     img_resized = transform(img) / 255.0
-    print(img_resized.shape)
-    print(img_resized)
-    print(video_width, video_height)
     return img_resized, video_height, video_width
 
 
@@ -212,8 +205,8 @@ class SyncedVideoStreamLoader:
             timestamp = index / self.video_fps
             self.video_stream = self.video_stream.seek(timestamp)
             img_dict = self.video_stream.__next__()
+            # Seek to the correct frame
             while abs(timestamp - img_dict['pts']) > (1 / self.video_fps):
-                print("seeking...")
                 img_dict = self.video_stream.__next__()
 
 

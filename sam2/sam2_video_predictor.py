@@ -65,7 +65,6 @@ class SAM2VideoPredictor(SAM2Base):
             inference_state["images"] = images
             inference_state["num_frames"] = len(images)
         else:
-            print("test")
             raise NotImplementedError("Only JPEG frames are supported at this moment")
         
 

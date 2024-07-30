@@ -12,7 +12,7 @@
 
 ![SA-V dataset](assets/sa_v_dataset.jpg?raw=true)
 
-## Custom fix and installatino
+## FIXES AFTER FORKING
 
 SAM has a custom cuda connected components implementation that has to be compiled with the same torch and cuda as the one you would use.
 There are several problems with it:

@@ -12,6 +12,7 @@ import numpy as np
 import torch
 from PIL import Image
 from tqdm import tqdm
+import cv2
 
 
 def get_sdpa_settings():
@@ -44,7 +45,7 @@ def get_sdpa_settings():
     return old_gpu, use_flash_attn, math_kernel_on
 
 
-def get_connected_components(mask):
+def get_connected_components_cuda(mask):
     """
     Get the connected components (8-connectivity) of binary masks of shape (N, 1, H, W).
 
@@ -61,6 +62,48 @@ def get_connected_components(mask):
     from sam2 import _C
 
     return _C.get_connected_componnets(mask.to(torch.uint8).contiguous())
+
+
+def get_connected_components(mask):
+    """
+    Get the connected components (8-connectivity) of binary masks of shape (N, 1, H, W).
+
+    Inputs:
+    - mask: A binary mask tensor of shape (N, 1, H, W), where 1 is foreground and 0 is
+            background.
+
+    Outputs:
+    - labels: A tensor of shape (N, 1, H, W) containing the connected component labels
+              for foreground pixels and 0 for background pixels.
+    - counts: A tensor of shape (N, 1, H, W) containing the area of the connected
+              components for foreground pixels and 0 for background pixels.
+    """
+    device = mask.device  # Store the device the input tensor is on
+    masks_np = mask.squeeze(1).cpu().numpy()  # Convert to numpy array and remove singleton dimension
+    labels_list = []
+    counts_list = []
+    
+    for i in range(masks_np.shape[0]):
+        num_labels, labels_im = cv2.connectedComponents(masks_np[i].astype(np.uint8), connectivity=8)
+        
+        counts = np.zeros_like(labels_im, dtype=np.int32)
+        for label in range(1, num_labels):  # Label 0 is background, skip it
+            counts[labels_im == label] = np.sum(labels_im == label)
+        
+        labels_list.append(labels_im)
+        counts_list.append(counts)
+    
+    labels = np.stack(labels_list, axis=0)
+    counts = np.stack(counts_list, axis=0)
+    
+    labels = np.expand_dims(labels, axis=1)  # Add singleton dimension back
+    counts = np.expand_dims(counts, axis=1)  # Add singleton dimension back
+    
+    labels_tensor = torch.from_numpy(labels).to(device)  # Convert back to torch tensor and move to original device
+    counts_tensor = torch.from_numpy(counts).to(device)  # Convert back to torch tensor and move to original device
+    
+    return labels_tensor, counts_tensor
+
 
 
 def mask_to_box(masks: torch.Tensor):

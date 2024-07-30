@@ -102,8 +102,11 @@ def _load_img_as_tensor(img_path, image_size):
     return img, video_height, video_width
 
 def _resize_img_tensor(img: torch.Tensor, image_size):
+    print(img.shape)
+    video_height, video_width = img.shape[1:]
     img_resized = img.resize_((3, image_size, image_size)) / 255.0
-    video_width, video_height = img.shape[1:]
+    print(img_resized.shape)
+    print(video_width, video_height)
     return img_resized, video_height, video_width
 
 

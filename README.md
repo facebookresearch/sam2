@@ -14,18 +14,16 @@
 
 ## Installation
 
-Please install SAM 2 on a GPU machine using:
+To install SAM 2, ensure you are using a machine with a GPU and that CUDA (which includes `nvcc`) is properly installed:
 
 ```bash
-git clone https://github.com/facebookresearch/segment-anything-2.git
-
-cd segment-anything-2; pip install -e .
+pip install git+https://github.com/facebookresearch/segment-anything-2.git@main
 ```
 
 To use the SAM 2 predictor and run the example notebooks, `jupyter` and `matplotlib` are required and can be installed by:
 
 ```bash
-pip install -e ".[demo]"
+pip install git+https://github.com/facebookresearch/segment-anything-2.git@main#egg=segment-anything-2[demo]
 ```
 
 ## Getting Started

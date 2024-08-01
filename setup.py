@@ -69,4 +69,8 @@ setup(
     python_requires=">=3.10.0",
     ext_modules=get_extensions(),
     cmdclass={"build_ext": BuildExtension.with_options(no_python_abi_suffix=True)},
+    include_package_data=True,
+    package_data={
+        "sam2": ["sam2_configs/*"],
+    },
 )

@@ -21,6 +21,10 @@ from sam2.utils.misc import get_sdpa_settings
 warnings.simplefilter(action="ignore", category=FutureWarning)
 OLD_GPU, USE_FLASH_ATTN, MATH_KERNEL_ON = get_sdpa_settings()
 
+USE_FLASH_ATTN = False
+MATH_KERNEL_ON = True
+OLD_GPU = True
+
 
 class TwoWayTransformer(nn.Module):
     def __init__(

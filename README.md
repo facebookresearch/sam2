@@ -17,9 +17,8 @@
 Please install SAM 2 on a GPU machine using:
 
 ```bash
-git clone https://github.com/facebookresearch/segment-anything-2.git
-
-cd segment-anything-2; pip install -e .
+pip install git+https://github.com/facebookresearch/segment-anything-2.git
+.
 ```
 
 To use the SAM 2 predictor and run the example notebooks, `jupyter` and `matplotlib` are required and can be installed by:

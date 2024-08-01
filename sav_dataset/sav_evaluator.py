@@ -72,7 +72,7 @@ parser.add_argument(
 parser.add_argument(
     "--do_not_skip_first_and_last_frame",
     help="In SA-V val and test, we skip the first and the last annotated frames in evaluation. "
-    "Set this to true for evaluation on settings that doen't skip first and last frames",
+    "Set this to true for evaluation on settings that doesn't skip first and last frames",
     action="store_true",
 )
 

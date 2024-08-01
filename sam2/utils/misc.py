@@ -280,7 +280,7 @@ def load_video_frames(
         images -= img_mean
         images /= img_std
         return images, video_height, video_width
-    elif isinstance(video_path, str) and os.path.isfile(video_path) and os.path.splitext(video_path)[1] in [".mp4", ".avi", ".mov", ".m4v"]:
+    elif isinstance(video_path, str) and os.path.isfile(video_path) and os.path.splitext(video_path)[1] in [".mp4", ".avi", ".mov"]:
         img_mean = torch.tensor(img_mean, dtype=torch.float32)[:, None, None]
         img_std = torch.tensor(img_std, dtype=torch.float32)[:, None, None]
         lazy_images = SyncedVideoStreamLoader(

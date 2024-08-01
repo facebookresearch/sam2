@@ -54,7 +54,7 @@ class SAM2VideoPredictor(SAM2Base):
             inference_state = {}
             inference_state["images"] = images
             inference_state["num_frames"] = len(images)
-        elif isinstance(video_path, str) and os.path.isfile(video_path) and os.path.splitext(video_path)[1] in [".mp4", ".avi", "mov", "m4v"]:
+        elif isinstance(video_path, str) and os.path.isfile(video_path) and os.path.splitext(video_path)[1] in [".mp4", ".avi", ".mov", ".m4v"]:
             images, video_height, video_width = load_video_frames(
                 video_path=video_path,
                 image_size=self.image_size,

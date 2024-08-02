@@ -18,6 +18,7 @@ To install SAM 2, ensure you are using a machine with a GPU and that CUDA (which
 
 ```bash
 pip install git+https://github.com/facebookresearch/segment-anything-2.git@main
+
 ```
 
 To use the SAM 2 predictor and run the example notebooks, `jupyter` and `matplotlib` are required and can be installed by:

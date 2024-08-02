@@ -10,6 +10,7 @@ from threading import Thread
 
 import numpy as np
 import torch
+import cv2
 from PIL import Image
 from tqdm import tqdm
 
@@ -158,6 +159,44 @@ class AsyncVideoFrameLoader:
 
     def __len__(self):
         return len(self.images)
+
+
+def load_video_frames_from_file(
+    video_path,
+    image_size,
+    offload_video_to_cpu,
+    img_mean=(0.485, 0.456, 0.406),
+    img_std=(0.229, 0.224, 0.225),
+):
+    frames = []
+    vid_cap = cv2.VideoCapture(video_path)
+    success, frame = vid_cap.read()
+    while success:
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frames.append(frame)
+        success, frame = vid_cap.read()
+
+    if len(frames) == 0:
+        raise ValueError("Could not read frames from video file")
+    video_width, video_height = Image.fromarray(frames[0]).size
+    num_frames = len(frames)
+    frames = [Image.fromarray(frame).convert("RGB").resize((image_size, image_size)) for frame in frames]
+    images = torch.zeros(num_frames, 3, image_size, image_size, dtype=torch.float32)
+    for i, frame in enumerate(frames):
+        np_frame = np.array(frame)
+        np_frame = np_frame / 255.
+        images[i] = torch.from_numpy(np_frame).permute(2, 0, 1)
+
+    img_mean = torch.tensor(img_mean, dtype=torch.float32)[:, None, None]
+    img_std = torch.tensor(img_std, dtype=torch.float32)[:, None, None]
+    if not offload_video_to_cpu:
+        images = images.cuda()
+        img_mean = img_mean.cuda()
+        img_std = img_std.cuda()
+
+    images -= img_mean
+    images /= img_std
+    return images, video_height, video_width
 
 
 def load_video_frames(

@@ -11,7 +11,12 @@ import torch
 from tqdm import tqdm
 
 from sam2.modeling.sam2_base import NO_OBJ_SCORE, SAM2Base
-from sam2.utils.misc import concat_points, fill_holes_in_mask_scores, load_video_frames
+from sam2.utils.misc import (
+    concat_points,
+    fill_holes_in_mask_scores,
+    load_video_frames,
+    load_video_frames_from_file,
+)
 
 
 class SAM2VideoPredictor(SAM2Base):
@@ -44,12 +49,21 @@ class SAM2VideoPredictor(SAM2Base):
         async_loading_frames=False,
     ):
         """Initialize a inference state."""
-        images, video_height, video_width = load_video_frames(
-            video_path=video_path,
-            image_size=self.image_size,
-            offload_video_to_cpu=offload_video_to_cpu,
-            async_loading_frames=async_loading_frames,
-        )
+        if video_path.endswith((".mp4", ".avi", ".mov")):
+            images, video_height, video_width = load_video_frames_from_file(
+                video_path=video_path,
+                image_size=self.image_size,
+                offload_video_to_cpu=offload_video_to_cpu,
+            )
+        elif os.path.isdir(video_path):
+            images, video_height, video_width = load_video_frames(
+                video_path=video_path,
+                image_size=self.image_size,
+                offload_video_to_cpu=offload_video_to_cpu,
+                async_loading_frames=async_loading_frames,
+            )
+        else:
+            raise ValueError("Unsupported video format: %s" % video_path)
         inference_state = {}
         inference_state["images"] = images
         inference_state["num_frames"] = len(images)

@@ -11,6 +11,8 @@ from hydra import compose
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
 
+from huggingface_hub import hf_hub_download
+
 
 def build_sam2(
     config_file,
@@ -74,6 +76,18 @@ def build_sam2_video_predictor(
     if mode == "eval":
         model.eval()
     return model
+
+
+def build_sam2_hf(model_id, **kwargs):
+    config_file = hf_hub_download(repo_id=model_id, filename=f"{model_id}.yaml")
+    ckpt_path = hf_hub_download(repo_id=model_id, filename=f"{model_id}.pt")
+    return build_sam2_video_predictor(config_file=config_file, ckpt_path=ckpt_path, **kwargs)
+
+
+def build_sam2_video_predictor_hf(model_id, **kwargs):
+    config_file = hf_hub_download(repo_id=model_id, filename=f"{model_id}.yaml")
+    ckpt_path = hf_hub_download(repo_id=model_id, filename=f"{model_id}.pt")
+    return build_sam2_video_predictor(config_file=config_file, ckpt_path=ckpt_path, **kwargs)
 
 
 def _load_checkpoint(model, ckpt_path):

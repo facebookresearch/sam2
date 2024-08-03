@@ -13,7 +13,7 @@ import torch
 from PIL.Image import Image
 
 from sam2.modeling.sam2_base import SAM2Base
-
+from sam2.build_sam import build_sam2_hf
 from sam2.utils.transforms import SAM2Transforms
 
 
@@ -61,6 +61,20 @@ class SAM2ImagePredictor:
             (128, 128),
             (64, 64),
         ]
+
+    def from_pretrained(model_id: str, **kwargs) -> "SAM2ImagePredictor":
+        """
+        Load a pretrained model from the Hugging Face model hub.
+
+        Arguments:
+          model_id (str): The Hugging Face repository ID.
+          **kwargs: Additional arguments to pass to the model constructor.
+
+        Returns:
+          (SAM2ImagePredictor): The loaded model.
+        """
+        sam_model = build_sam2_hf(model_id, **kwargs)
+        return SAM2ImagePredictor(sam_model)
 
     @torch.no_grad()
     def set_image(

@@ -164,6 +164,7 @@ def load_video_frames(
     video_path,
     image_size,
     offload_video_to_cpu,
+    device,
     img_mean=(0.485, 0.456, 0.406),
     img_std=(0.229, 0.224, 0.225),
     async_loading_frames=False,
@@ -204,9 +205,9 @@ def load_video_frames(
     for n, img_path in enumerate(tqdm(img_paths, desc="frame loading (JPEG)")):
         images[n], video_height, video_width = _load_img_as_tensor(img_path, image_size)
     if not offload_video_to_cpu:
-        images = images.cuda()
-        img_mean = img_mean.cuda()
-        img_std = img_std.cuda()
+        images = images.to(device)
+        img_mean = img_mean.to(device)
+        img_std = img_std.to(device)
     # normalize by mean and std
     images -= img_mean
     images /= img_std

@@ -49,6 +49,7 @@ class SAM2VideoPredictor(SAM2Base):
             image_size=self.image_size,
             offload_video_to_cpu=offload_video_to_cpu,
             async_loading_frames=async_loading_frames,
+            device=self.device,
         )
         inference_state = {}
         inference_state["images"] = images
@@ -64,11 +65,11 @@ class SAM2VideoPredictor(SAM2Base):
         # the original video height and width, used for resizing final output scores
         inference_state["video_height"] = video_height
         inference_state["video_width"] = video_width
-        inference_state["device"] = torch.device("cuda")
+        inference_state["device"] = torch.device(self.device)
         if offload_state_to_cpu:
             inference_state["storage_device"] = torch.device("cpu")
         else:
-            inference_state["storage_device"] = torch.device("cuda")
+            inference_state["storage_device"] = torch.device(self.device)
         # inputs on each frame
         inference_state["point_inputs_per_obj"] = {}
         inference_state["mask_inputs_per_obj"] = {}
@@ -215,7 +216,7 @@ class SAM2VideoPredictor(SAM2Base):
                 prev_out = obj_output_dict["non_cond_frame_outputs"].get(frame_idx)
 
         if prev_out is not None and prev_out["pred_masks"] is not None:
-            prev_sam_mask_logits = prev_out["pred_masks"].cuda(non_blocking=True)
+            prev_sam_mask_logits = prev_out["pred_masks"].to(self.device, non_blocking=True)
             # Clamp the scale of prev_sam_mask_logits to avoid rare numerical issues.
             prev_sam_mask_logits = torch.clamp(prev_sam_mask_logits, -32.0, 32.0)
         current_out, _ = self._run_single_frame_inference(
@@ -734,7 +735,7 @@ class SAM2VideoPredictor(SAM2Base):
         )
         if backbone_out is None:
             # Cache miss -- we will run inference on a single image
-            image = inference_state["images"][frame_idx].cuda().float().unsqueeze(0)
+            image = inference_state["images"][frame_idx].to(self.device).float().unsqueeze(0)
             backbone_out = self.forward_image(image)
             # Cache the most recent frame's feature (for repeated interactions with
             # a frame; we can use an LRU cache for more frames in the future).

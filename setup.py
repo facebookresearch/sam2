@@ -6,6 +6,7 @@
 
 from setuptools import find_packages, setup
 from torch.utils.cpp_extension import BuildExtension, CUDAExtension
+import subprocess
 
 # Package metadata
 NAME = "SAM 2"
@@ -36,8 +37,18 @@ EXTRA_PACKAGES = {
     "dev": ["black==24.2.0", "usort==1.0.2", "ufmt==2.0.0b2"],
 }
 
+def find_cuda():
+    try:
+        subprocess.check_output(["nvcc", "--version"])
+        return True
+    except subprocess.CalledProcessError:
+        return False
+    except FileNotFoundError:
+        return False
 
 def get_extensions():
+    if not find_cuda():
+        return []
     srcs = ["sam2/csrc/connected_components.cu"]
     compile_args = {
         "cxx": [],

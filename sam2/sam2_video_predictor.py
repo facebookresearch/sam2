@@ -11,7 +11,7 @@ import torch
 from tqdm import tqdm
 
 from sam2.modeling.sam2_base import NO_OBJ_SCORE, SAM2Base
-from sam2.utils.misc import concat_points, fill_holes_in_mask_scores, load_video_frames
+from sam2.utils.misc import concat_points, fill_holes_in_mask_scores, load_video_frames, load_video_frames_from_memory
 
 
 class SAM2VideoPredictor(SAM2Base):
@@ -38,17 +38,15 @@ class SAM2VideoPredictor(SAM2Base):
     @torch.inference_mode()
     def init_state(
         self,
-        video_path,
+        imgs,
         offload_video_to_cpu=False,
         offload_state_to_cpu=False,
-        async_loading_frames=False,
     ):
         """Initialize a inference state."""
-        images, video_height, video_width = load_video_frames(
-            video_path=video_path,
+        images, video_height, video_width = load_video_frames_from_memory(
+            imgs=imgs,
             image_size=self.image_size,
             offload_video_to_cpu=offload_video_to_cpu,
-            async_loading_frames=async_loading_frames,
         )
         inference_state = {}
         inference_state["images"] = images
@@ -64,7 +62,12 @@ class SAM2VideoPredictor(SAM2Base):
         # the original video height and width, used for resizing final output scores
         inference_state["video_height"] = video_height
         inference_state["video_width"] = video_width
-        inference_state["device"] = torch.device("cuda")
+
+        if torch.cuda.is_available():
+            inference_state["device"] = torch.device("cuda")
+        else:
+            inference_state["device"] = torch.device("cpu")
+
         if offload_state_to_cpu:
             inference_state["storage_device"] = torch.device("cpu")
         else:
@@ -734,7 +737,12 @@ class SAM2VideoPredictor(SAM2Base):
         )
         if backbone_out is None:
             # Cache miss -- we will run inference on a single image
-            image = inference_state["images"][frame_idx].cuda().float().unsqueeze(0)
+
+            if torch.cuda.is_available():
+                image = inference_state["images"][frame_idx].cuda().float().unsqueeze(0)
+            else:
+                image = inference_state["images"][frame_idx].float().unsqueeze(0)
+
             backbone_out = self.forward_image(image)
             # Cache the most recent frame's feature (for repeated interactions with
             # a frame; we can use an LRU cache for more frames in the future).

@@ -567,10 +567,19 @@ class SAM2Base(torch.nn.Module):
                     continue  # skip padding frames
                 # "maskmem_features" might have been offloaded to CPU in demo use cases,
                 # so we load it back to GPU (it's a no-op if it's already on GPU).
-                feats = prev["maskmem_features"].cuda(non_blocking=True)
+                if torch.cuda.is_available():
+                    feats = prev["maskmem_features"].cuda(non_blocking=True)
+                else:
+                    feats = prev["maskmem_features"]
+
                 to_cat_memory.append(feats.flatten(2).permute(2, 0, 1))
                 # Spatial positional encoding (it might have been offloaded to CPU in eval)
-                maskmem_enc = prev["maskmem_pos_enc"][-1].cuda()
+
+                if torch.cuda.is_available():
+                    maskmem_enc = prev["maskmem_pos_enc"][-1].cuda()
+                else:
+                    maskmem_enc = prev["maskmem_pos_enc"][-1]
+
                 maskmem_enc = maskmem_enc.flatten(2).permute(2, 0, 1)
                 # Temporal positional encoding
                 maskmem_enc = (

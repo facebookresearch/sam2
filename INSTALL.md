@@ -56,6 +56,12 @@ Also, you should make sure
 python -c 'import torch; from torch.utils.cpp_extension import CUDA_HOME; print(torch.cuda.is_available(), CUDA_HOME)'
 ```
 print `(True, a directory with cuda)` to verify that the CUDA toolkits are correctly set up.
+
+If you are still having problems after verifying that the CUDA toolkit is installed and the `CUDA_HOME` environment variable is set properly, you may have to add the `--no-build-isolation` flag to the pip command:
+```
+pip install --no-build-isolation -e .
+```
+
 </details>
 
 <details>

@@ -47,10 +47,10 @@ cd checkpoints
 
 or individually from:
 
-- [sam2_hiera_tiny.pt](https://dl.fbaipublicfiles.com/segment_anything_2/072824/sam2_hiera_tiny.pt)
-- [sam2_hiera_small.pt](https://dl.fbaipublicfiles.com/segment_anything_2/072824/sam2_hiera_small.pt)
-- [sam2_hiera_base_plus.pt](https://dl.fbaipublicfiles.com/segment_anything_2/072824/sam2_hiera_base_plus.pt)
-- [sam2_hiera_large.pt](https://dl.fbaipublicfiles.com/segment_anything_2/072824/sam2_hiera_large.pt)
+- [sam2_hiera_tiny.pt](https://huggingface.co/facebook/sam2-hiera-tiny)
+- [sam2_hiera_small.pt](https://huggingface.co/facebook/sam2-hiera-small)
+- [sam2_hiera_base_plus.pt](https://huggingface.co/facebook/sam2-hiera-base-plus)
+- [sam2_hiera_large.pt](https://huggingface.co/facebook/sam2-hiera-large)
 
 Then SAM 2 can be used in a few lines as follows for image and video prediction.
 

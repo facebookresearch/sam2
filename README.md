@@ -101,7 +101,7 @@ Please refer to the examples in [video_predictor_example.ipynb](./notebooks/vide
 
 ## Load from Hugging Face
 
-Alternatively, models can also be loaded from Hugging Face using the `from_pretrained` method:
+Alternatively, models can also be loaded from [Hugging Face](https://huggingface.co/models?search=facebook/sam2) (requires `pip install huggingface_hub`).
 
 For image prediction:
 

@@ -104,7 +104,7 @@ class SAM2VideoPredictor(SAM2Base):
         return inference_state
 
     @classmethod
-    def from_pretrained(cls, model_id: str, **kwargs) -> "SAM2ImagePredictor":
+    def from_pretrained(cls, model_id: str, **kwargs) -> "SAM2VideoPredictor":
         """
         Load a pretrained model from the Hugging Face model hub.
 
@@ -113,7 +113,7 @@ class SAM2VideoPredictor(SAM2Base):
           **kwargs: Additional arguments to pass to the model constructor.
 
         Returns:
-          (SAM2ImagePredictor): The loaded model.
+          (SAM2VideoPredictor): The loaded model.
         """
         from sam2.build_sam import build_sam2_video_predictor_hf
 

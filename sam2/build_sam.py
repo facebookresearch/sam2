@@ -11,8 +11,6 @@ from hydra import compose
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
 
-from huggingface_hub import hf_hub_download
-
 
 def build_sam2(
     config_file,
@@ -80,6 +78,8 @@ def build_sam2_video_predictor(
 
 def build_sam2_hf(model_id, **kwargs):
 
+    from huggingface_hub import hf_hub_download
+
     model_id_to_filenames = {
         "facebook/sam2-hiera-tiny": ("sam2_hiera_t.yaml", "sam2_hiera_tiny.pt"),
         "facebook/sam2-hiera-small": ("sam2_hiera_s.yaml", "sam2_hiera_small.pt"),
@@ -87,12 +87,14 @@ def build_sam2_hf(model_id, **kwargs):
         "facebook/sam2-hiera-large": ("sam2_hiera_l.yaml", "sam2_hiera_large.pt"),
     }
     config_name, checkpoint_name = model_id_to_filenames[model_id]
-    # config_file = hf_hub_download(repo_id=model_id, filename=config_name)
     ckpt_path = hf_hub_download(repo_id=model_id, filename=checkpoint_name)
     return build_sam2_video_predictor(config_file=config_name, ckpt_path=ckpt_path, **kwargs)
 
 
 def build_sam2_video_predictor_hf(model_id, **kwargs):
+
+    from huggingface_hub import hf_hub_download
+
     config_file = hf_hub_download(repo_id=model_id, filename=f"{model_id}.yaml")
     ckpt_path = hf_hub_download(repo_id=model_id, filename=f"{model_id}.pt")
     return build_sam2_video_predictor(config_file=config_file, ckpt_path=ckpt_path, **kwargs)

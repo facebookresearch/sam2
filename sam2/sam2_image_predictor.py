@@ -13,7 +13,6 @@ import torch
 from PIL.Image import Image
 
 from sam2.modeling.sam2_base import SAM2Base
-from sam2.build_sam import build_sam2_hf
 from sam2.utils.transforms import SAM2Transforms
 
 
@@ -74,6 +73,8 @@ class SAM2ImagePredictor:
         Returns:
           (SAM2ImagePredictor): The loaded model.
         """
+        from sam2.build_sam import build_sam2_hf
+
         sam_model = build_sam2_hf(model_id, **kwargs)
         return cls(sam_model)
 

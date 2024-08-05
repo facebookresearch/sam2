@@ -60,12 +60,9 @@ SAM 2 has all the capabilities of [SAM](https://github.com/facebookresearch/segm
 
 ```python
 import torch
-from sam2.build_sam import build_sam2
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 
-checkpoint = "./checkpoints/sam2_hiera_large.pt"
-model_cfg = "sam2_hiera_l.yaml"
-predictor = SAM2ImagePredictor(build_sam2(model_cfg, checkpoint))
+predictor = SAM2ImagePredictor.from_pretrained("facebook/sam2-hiera-large")
 
 with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
     predictor.set_image(<your_image>)
@@ -82,11 +79,9 @@ For promptable segmentation and tracking in videos, we provide a video predictor
 
 ```python
 import torch
-from sam2.build_sam import build_sam2_video_predictor
+from sam2.sam2_video_predictor import SAM2VideoPredictor
 
-checkpoint = "./checkpoints/sam2_hiera_large.pt"
-model_cfg = "sam2_hiera_l.yaml"
-predictor = build_sam2_video_predictor(model_cfg, checkpoint)
+predictor = SAM2VideoPredictor.from_pretrained("facebook/sam2-hiera-large")
 
 with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
     state = predictor.init_state(<your_video>)

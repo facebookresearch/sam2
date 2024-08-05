@@ -14,7 +14,7 @@
 
 ## Installation
 
-Please install SAM 2 on a GPU machine using:
+SAM 2 needs to be installed first before use. The code requires `python>=3.10`, as well as `torch>=2.3.1` and `torchvision>=0.18.1`. Please follow the instructions [here](https://pytorch.org/get-started/locally/) to install both PyTorch and TorchVision dependencies. You can install SAM 2 on a GPU machine using:
 
 ```bash
 pip install git+https://github.com/facebookresearch/segment-anything-2.git
@@ -25,6 +25,12 @@ To use the SAM 2 predictor and run the example notebooks, `jupyter` and `matplot
 ```bash
 pip install -e ".[demo]"
 ```
+
+Note:
+1. It's recommended to create a new Python environment for this installation and install PyTorch 2.3.1 (or higher) via `pip` following https://pytorch.org/. If you have a PyTorch version lower than 2.3.1 in your current environment, the installation command above will try to upgrade it to the latest PyTorch version using `pip`.
+2. The step above requires compiling a custom CUDA kernel with the `nvcc` compiler. If it isn't already available on your machine, please install the [CUDA toolkits](https://developer.nvidia.com/cuda-toolkit-archive) with a version that matches your PyTorch CUDA version.
+
+Please see [`INSTALL.md`](./INSTALL.md) for FAQs on potential issues and solutions.
 
 ## Getting Started
 
@@ -84,7 +90,7 @@ with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
     state = predictor.init_state(<your_video>)
 
     # add new prompts and instantly get the output on the same frame
-    frame_idx, object_ids, masks = predictor.add_new_points(state, <your prompts>):
+    frame_idx, object_ids, masks = predictor.add_new_points(state, <your_prompts>):
 
     # propagate the prompts to get masklets throughout the video
     for frame_idx, object_ids, masks in predictor.propagate_in_video(state):
@@ -132,7 +138,8 @@ If you use SAM 2 or the SA-V dataset in your research, please use the following 
 @article{ravi2024sam2,
   title={SAM 2: Segment Anything in Images and Videos},
   author={Ravi, Nikhila and Gabeur, Valentin and Hu, Yuan-Ting and Hu, Ronghang and Ryali, Chaitanya and Ma, Tengyu and Khedr, Haitham and R{\"a}dle, Roman and Rolland, Chloe and Gustafson, Laura and Mintun, Eric and Pan, Junting and Alwala, Kalyan Vasudev and Carion, Nicolas and Wu, Chao-Yuan and Girshick, Ross and Doll{\'a}r, Piotr and Feichtenhofer, Christoph},
-  journal={arXiv preprint},
+  journal={arXiv preprint arXiv:2408.00714},
+  url={https://arxiv.org/abs/2408.00714},
   year={2024}
 }
 ```

@@ -60,6 +60,22 @@ SAM 2 has all the capabilities of [SAM](https://github.com/facebookresearch/segm
 
 ```python
 import torch
+from sam2.build_sam import build_sam2
+from sam2.sam2_image_predictor import SAM2ImagePredictor
+
+checkpoint = "./checkpoints/sam2_hiera_large.pt"
+model_cfg = "sam2_hiera_l.yaml"
+predictor = SAM2ImagePredictor(build_sam2(model_cfg, checkpoint))
+
+with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
+    predictor.set_image(<your_image>)
+    masks, _, _ = predictor.predict(<input_prompts>)
+```
+
+or from Hugging Face, as follows:
+
+```python
+import torch
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 
 predictor = SAM2ImagePredictor.from_pretrained("facebook/sam2-hiera-large")
@@ -92,6 +108,19 @@ with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
     # propagate the prompts to get masklets throughout the video
     for frame_idx, object_ids, masks in predictor.propagate_in_video(state):
         ...
+```
+
+or from Hugging Face, as follows:
+
+```python
+import torch
+from sam2.sam2_video_predictor import SAM2VideoPredictor
+
+predictor = SAM2VideoPredictor.from_pretrained("facebook/sam2-hiera-large")
+
+with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
+    predictor.set_image(<your_image>)
+    masks, _, _ = predictor.predict(<input_prompts>)
 ```
 
 Please refer to the examples in [video_predictor_example.ipynb](./notebooks/video_predictor_example.ipynb) for details on how to add prompts, make refinements, and track multiple objects in videos.

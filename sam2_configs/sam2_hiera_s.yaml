@@ -23,7 +23,7 @@ model:
         temperature: 10000
       d_model: 256
       backbone_channel_list: [768, 384, 192, 96]
-      fpn_top_down_levels: [2, 3]  # output level 0 and 1 directly use the backbone features
+      fpn_top_down_levels: [2, 3]  # output levels 0 and 1 directly use the backbone features
       fpn_interp_model: nearest
 
   memory_attention:

@@ -106,7 +106,7 @@ class SAM2VideoPredictor(SAM2Base):
     @classmethod
     def from_pretrained(cls, model_id: str, **kwargs) -> "SAM2VideoPredictor":
         """
-        Load a pretrained model from the Hugging Face model hub.
+        Load a pretrained model from the Hugging Face hub.
 
         Arguments:
           model_id (str): The Hugging Face repository ID.

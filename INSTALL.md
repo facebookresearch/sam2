@@ -111,3 +111,33 @@ OLD_GPU, USE_FLASH_ATTN, MATH_KERNEL_ON = True, True, True
 ```
 to relax the attention kernel setting and use other kernels than Flash Attention.
 </details>
+
+<details>
+<summary>
+I got `Error compiling objects for extension`
+</summary>
+<br/>
+
+You may see error log of:
+> unsupported Microsoft Visual Studio version! Only the versions between 2017 and 2022 (inclusive) are supported! The nvcc flag '-allow-unsupported-compiler' can be used to override this version check; however, using an unsupported host compiler may cause compilation failure or incorrect run time execution. Use at your own risk.
+
+This is probably because your versions of CUDA and Visual Studio are incompatible. (see also https://stackoverflow.com/questions/78515942/cuda-compatibility-with-visual-studio-2022-version-17-10 for a discussion in stackoverflow).<br> 
+You may be able to fix this by adding the `-allow-unsupported-compiler` argument to `nvcc` after L48 in the [setup.py](https://github.com/facebookresearch/segment-anything-2/blob/main/setup.py). <br>
+After adding the argument, `get_extension()` will look like this:
+```python
+def get_extensions():
+    srcs = ["sam2/csrc/connected_components.cu"]
+    compile_args = {
+        "cxx": [],
+        "nvcc": [
+            "-DCUDA_HAS_FP16=1",
+            "-D__CUDA_NO_HALF_OPERATORS__",
+            "-D__CUDA_NO_HALF_CONVERSIONS__",
+            "-D__CUDA_NO_HALF2_OPERATORS__",
+            "-allow-unsupported-compiler"  # Add this argument
+        ],
+    }
+    ext_modules = [CUDAExtension("sam2._C", srcs, extra_compile_args=compile_args)]
+    return ext_modules
+```
+</details>

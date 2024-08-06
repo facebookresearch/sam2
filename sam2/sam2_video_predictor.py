@@ -119,7 +119,7 @@ class SAM2VideoPredictor(SAM2Base):
 
         sam_model = build_sam2_video_predictor_hf(model_id, **kwargs)
         return cls(sam_model)
-    
+
     def _obj_id_to_idx(self, inference_state, obj_id):
         """Map client-side object id to model-side object index."""
         obj_idx = inference_state["obj_id_to_idx"].get(obj_id, None)

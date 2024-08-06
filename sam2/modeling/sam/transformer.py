@@ -19,7 +19,7 @@ from sam2.modeling.sam2_utils import MLP
 from sam2.utils.misc import get_sdpa_settings
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
-OLD_GPU, USE_FLASH_ATTN, MATH_KERNEL_ON = get_sdpa_settings()
+OLD_GPU, USE_FLASH_ATTN, MATH_KERNEL_ON = True, True, True
 
 
 class TwoWayTransformer(nn.Module):

@@ -82,9 +82,11 @@ For promptable segmentation and tracking in videos, we provide a video predictor
 
 ```python
 import torch
-from sam2.sam2_video_predictor import SAM2VideoPredictor
+from sam2.build_sam import build_sam2_video_predictor
 
-predictor = SAM2VideoPredictor.from_pretrained("facebook/sam2-hiera-large")
+checkpoint = "./checkpoints/sam2_hiera_large.pt"
+model_cfg = "sam2_hiera_l.yaml"
+predictor = build_sam2_video_predictor(model_cfg, checkpoint)
 
 with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
     state = predictor.init_state(<your_video>)

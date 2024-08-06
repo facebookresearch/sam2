@@ -11,6 +11,28 @@ Then, install SAM 2 from the root of this repository via
 pip install -e ".[demo]"
 ```
 
+Note that you may skip building the SAM 2 CUDA extension during installation via environment variable `SAM2_BUILD_CUDA=0`, as follows:
+```bash
+# skip the SAM 2 CUDA extension
+SAM2_BUILD_CUDA=0 pip install -e ".[demo]"
+```
+This would also skip the post-processing step at runtime (removing small holes and sprinkles in the output masks, which requires the CUDA extension), but shouldn't affect the results in most cases.
+
+### Building the SAM 2 CUDA extension
+
+By default, we allow the installation to proceed even if the SAM 2 CUDA extension fails to build. (In this case, the build errors are hidden unless using `-v` for verbose output in `pip install`.)
+
+If you see a message like `Skipping the post-processing step due to the error above` at runtime or `Failed to build the SAM 2 CUDA extension due to the error above` during installation, it indicates that the SAM 2 CUDA extension failed to build in your environment. In this case, you can still use SAM 2 for both image and video applications, but the post-processing step (removing small holes and sprinkles in the output masks) will be skipped. This shouldn't affect the results in most cases.
+
+If you would like to enable this post-processing step, you can reinstall SAM 2 on a GPU machine with environment variable `SAM2_BUILD_ALLOW_ERRORS=0` to force building the CUDA extension (and raise errors if it fails to build), as follows
+```bash
+pip uninstall -y SAM-2; SAM2_BUILD_ALLOW_ERRORS=0 pip install -v -e ".[demo]"
+```
+
+Note that PyTorch needs to be installed first before building the SAM 2 CUDA extension. It's also necessary to install [CUDA toolkits](https://developer.nvidia.com/cuda-toolkit-archive) that match the CUDA version for your PyTorch installation. (This should typically be CUDA 12.1 if you follow the default installation command.) After installing the CUDA toolkits, you can check its version via `nvcc --version`.
+
+Please check the section below on common installation issues if the CUDA extension fails to build during installation or load at runtime.
+
 ### Common Installation Issues
 
 Click each issue for its solutions:
@@ -22,6 +44,8 @@ I got `ImportError: cannot import name '_C' from 'sam2'`
 <br/>
 
 This is usually because you haven't run the `pip install -e ".[demo]"` step above or the installation failed. Please install SAM 2 first, and see the other issues if your installation fails.
+
+In some systems, you may need to run `python setup.py build_ext --inplace` in the SAM 2 repo root as suggested in https://github.com/facebookresearch/segment-anything-2/issues/77.
 </details>
 
 <details>

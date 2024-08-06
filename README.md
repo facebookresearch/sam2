@@ -47,10 +47,10 @@ cd checkpoints
 
 or individually from:
 
-- [sam2_hiera_tiny.pt](https://huggingface.co/facebook/sam2-hiera-tiny)
-- [sam2_hiera_small.pt](https://huggingface.co/facebook/sam2-hiera-small)
-- [sam2_hiera_base_plus.pt](https://huggingface.co/facebook/sam2-hiera-base-plus)
-- [sam2_hiera_large.pt](https://huggingface.co/facebook/sam2-hiera-large)
+- [sam2_hiera_tiny.pt](https://dl.fbaipublicfiles.com/segment_anything_2/072824/sam2_hiera_tiny.pt)
+- [sam2_hiera_small.pt](https://dl.fbaipublicfiles.com/segment_anything_2/072824/sam2_hiera_small.pt)
+- [sam2_hiera_base_plus.pt](https://dl.fbaipublicfiles.com/segment_anything_2/072824/sam2_hiera_base_plus.pt)
+- [sam2_hiera_large.pt](https://dl.fbaipublicfiles.com/segment_anything_2/072824/sam2_hiera_large.pt)
 
 Then SAM 2 can be used in a few lines as follows for image and video prediction.
 
@@ -99,7 +99,7 @@ with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
 
 Please refer to the examples in [video_predictor_example.ipynb](./notebooks/video_predictor_example.ipynb) for details on how to add prompts, make refinements, and track multiple objects in videos.
 
-## Load from Hugging Face
+## Load from 🤗 Hugging Face
 
 Alternatively, models can also be loaded from [Hugging Face](https://huggingface.co/models?search=facebook/sam2) (requires `pip install huggingface_hub`).
 

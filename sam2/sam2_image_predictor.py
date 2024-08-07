@@ -62,6 +62,23 @@ class SAM2ImagePredictor:
             (64, 64),
         ]
 
+    @classmethod
+    def from_pretrained(cls, model_id: str, **kwargs) -> "SAM2ImagePredictor":
+        """
+        Load a pretrained model from the Hugging Face hub.
+
+        Arguments:
+          model_id (str): The Hugging Face repository ID.
+          **kwargs: Additional arguments to pass to the model constructor.
+
+        Returns:
+          (SAM2ImagePredictor): The loaded model.
+        """
+        from sam2.build_sam import build_sam2_hf
+
+        sam_model = build_sam2_hf(model_id, **kwargs)
+        return cls(sam_model)
+
     @torch.no_grad()
     def set_image(
         self,

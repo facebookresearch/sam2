@@ -92,14 +92,50 @@ with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
     state = predictor.init_state(<your_video>)
 
     # add new prompts and instantly get the output on the same frame
-    frame_idx, object_ids, masks = predictor.add_new_points(state, <your_prompts>):
+    frame_idx, object_ids, masks = predictor.add_new_points_or_box(state, <your_prompts>):
 
     # propagate the prompts to get masklets throughout the video
     for frame_idx, object_ids, masks in predictor.propagate_in_video(state):
         ...
 ```
 
-Please refer to the examples in [video_predictor_example.ipynb](./notebooks/video_predictor_example.ipynb) for details on how to add prompts, make refinements, and track multiple objects in videos.
+Please refer to the examples in [video_predictor_example.ipynb](./notebooks/video_predictor_example.ipynb) for details on how to add click or box prompts, make refinements, and track multiple objects in videos.
+
+## Load from 🤗 Hugging Face
+
+Alternatively, models can also be loaded from [Hugging Face](https://huggingface.co/models?search=facebook/sam2) (requires `pip install huggingface_hub`).
+
+For image prediction:
+
+```python
+import torch
+from sam2.sam2_image_predictor import SAM2ImagePredictor
+
+predictor = SAM2ImagePredictor.from_pretrained("facebook/sam2-hiera-large")
+
+with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
+    predictor.set_image(<your_image>)
+    masks, _, _ = predictor.predict(<input_prompts>)
+```
+
+For video prediction:
+
+```python
+import torch
+from sam2.sam2_video_predictor import SAM2VideoPredictor
+
+predictor = SAM2VideoPredictor.from_pretrained("facebook/sam2-hiera-large")
+
+with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
+    state = predictor.init_state(<your_video>)
+
+    # add new prompts and instantly get the output on the same frame
+    frame_idx, object_ids, masks = predictor.add_new_points_or_box(state, <your_prompts>):
+
+    # propagate the prompts to get masklets throughout the video
+    for frame_idx, object_ids, masks in predictor.propagate_in_video(state):
+        ...
+```
 
 ## Model Description
 

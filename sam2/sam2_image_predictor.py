@@ -448,6 +448,51 @@ class SAM2ImagePredictor:
             self._features is not None
         ), "Features must exist if an image has been set."
         return self._features["image_embed"]
+    
+
+    def get_high_res_features(self) -> torch.Tensor:
+        """
+        Returns the high resolution features for the currently set image.
+        """
+        if not self._is_image_set:
+            raise RuntimeError(
+                "An image must be set with .set_image(...) to generate an embedding."
+            )
+        assert (
+            self._features is not None
+        ), "Features must exist if an image has been set."
+        return self._features["high_res_feats"]
+    
+
+    def set_image_embedding(
+        self, 
+        image_embedding: torch.Tensor, 
+        img_hw: Tuple,
+        high_res_features: Optional[List[torch.Tensor]] = None
+    ):
+        """
+        Sets the image embeddings for a previously computed image e.g.
+        loaded from file.
+
+        Arguments:
+          image_embedding (torch.Tensor): A 1xCxHxW Tensor, where C is the 
+            embedding dimension and (H,W) are the embedding spatial dimension 
+            of SAM (typically C=256, H=W=64).
+          img_hw (Tuple): Height and Width of the original image.
+          high_res_features (torch.Tensor or None): Optional high res features
+        
+
+        """
+        self._is_image_set = True
+        self._orig_hw = [img_hw]
+        self._features = {}
+        self._features["image_embed"] = image_embedding
+
+        if high_res_features:
+            self._features["high_res_feats"] = high_res_features
+
+        self._is_batch = False
+
 
     @property
     def device(self) -> torch.device:

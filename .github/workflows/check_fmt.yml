@@ -1,0 +1,17 @@
+name: SAM2/fmt
+on:
+  pull_request:
+    branches:
+    - main
+jobs:
+  ufmt_check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check formatting
+        uses: omnilib/ufmt@action-v1
+        with:
+          path: sam2 tools
+          version: "2.0.0b2"
+          python-version: "3.10"
+          black-version: "24.2.0"
+          usort-version: "1.0.2"

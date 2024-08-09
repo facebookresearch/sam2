@@ -118,6 +118,8 @@ setup(
     author_email=AUTHOR_EMAIL,
     license=LICENSE,
     packages=find_packages(exclude="notebooks"),
+    package_data={"": ["*.yaml"]},  # SAM 2 configuration files
+    include_package_data=True,
     install_requires=REQUIRED_PACKAGES,
     extras_require=EXTRA_PACKAGES,
     python_requires=">=3.10.0",

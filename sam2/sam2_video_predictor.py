@@ -6,7 +6,7 @@
 
 import warnings
 from collections import OrderedDict
-
+import os
 import torch
 
 from tqdm import tqdm
@@ -45,15 +45,30 @@ class SAM2VideoPredictor(SAM2Base):
         async_loading_frames=False,
     ):
         """Initialize a inference state."""
-        images, video_height, video_width = load_video_frames(
-            video_path=video_path,
-            image_size=self.image_size,
-            offload_video_to_cpu=offload_video_to_cpu,
-            async_loading_frames=async_loading_frames,
-        )
-        inference_state = {}
-        inference_state["images"] = images
-        inference_state["num_frames"] = len(images)
+        if isinstance(video_path, str) and os.path.isdir(video_path):
+            images, video_height, video_width = load_video_frames(
+                video_path=video_path,
+                image_size=self.image_size,
+                offload_video_to_cpu=offload_video_to_cpu,
+                async_loading_frames=async_loading_frames,
+            )
+            inference_state = {}
+            inference_state["images"] = images
+            inference_state["num_frames"] = len(images)
+        elif isinstance(video_path, str) and os.path.isfile(video_path) and os.path.splitext(video_path)[1] in [".mp4", ".avi", ".mov"]:
+            images, video_height, video_width = load_video_frames(
+                video_path=video_path,
+                image_size=self.image_size,
+                offload_video_to_cpu=offload_video_to_cpu,
+                async_loading_frames=async_loading_frames,
+            )
+            inference_state = {}
+            inference_state["images"] = images
+            inference_state["num_frames"] = len(images)
+        else:
+            raise NotImplementedError("Only JPEG frames are supported at this moment")
+        
+
         # whether to offload the video frames to CPU memory
         # turning on this option saves the GPU memory with only a very small overhead
         inference_state["offload_video_to_cpu"] = offload_video_to_cpu

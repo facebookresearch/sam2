@@ -98,6 +98,8 @@ with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
     for frame_idx, object_ids, masks in predictor.propagate_in_video(state):
         ...
 ```
+Please refer to the examples in [video_predictor_example.ipynb](./notebooks/video_predictor_example.ipynb) for details on how to add prompts, make refinements, and track multiple objects in videos.
+
 
 ### Camera prediction
 
@@ -130,8 +132,8 @@ with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
             out_obj_ids, out_mask_logits = predictor.track(frame)
             ...
 ```
+Please refer to the examples in [camera_predictor_example.ipynb](./notebooks/camera_predictor_example.ipynb) for details on how to add prompts, make refinements, and track multiple objects on live video.
 
-Please refer to the examples in [video_predictor_example.ipynb](./notebooks/video_predictor_example.ipynb) for details on how to add prompts, make refinements, and track multiple objects in videos.
 
 ## Model Description
 

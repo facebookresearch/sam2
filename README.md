@@ -19,7 +19,7 @@ SAM 2 needs to be installed first before use. The code requires `python>=3.10`, 
 ```bash
 git clone https://github.com/facebookresearch/segment-anything-2.git
 
-cd segment-anything-2; pip install -e .
+cd segment-anything-2 && pip install -e .
 ```
 
 To use the SAM 2 predictor and run the example notebooks, `jupyter` and `matplotlib` are required and can be installed by:

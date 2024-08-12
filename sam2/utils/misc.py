@@ -189,7 +189,15 @@ def load_video_frames(
     if isinstance(video_path, str) and os.path.isdir(video_path):
         jpg_folder = video_path
     else:
-        raise NotImplementedError("Only JPEG frames are supported at this moment")
+        raise NotImplementedError(
+            "Only JPEG frames are supported at this moment. For video files, you may use "
+            "ffmpeg (https://ffmpeg.org/) to extract frames into a folder of JPEG files, such as \n"
+            "```\n"
+            "ffmpeg -i <your_video>.mp4 -q:v 2 -start_number 0 <output_dir>/'%05d.jpg'\n"
+            "```\n"
+            "where `-q:v` generates high-quality JPEG frames and `-start_number 0` asks "
+            "ffmpeg to start the JPEG file from 00000.jpg."
+        )
 
     frame_names = [
         p
@@ -245,8 +253,9 @@ def fill_holes_in_mask_scores(mask, max_area):
     except Exception as e:
         # Skip the post-processing step on removing small holes if the CUDA kernel fails
         warnings.warn(
-            f"{e}\n\nSkipping the post-processing step due to the error above. "
-            "Consider building SAM 2 with CUDA extension to enable post-processing (see "
+            f"{e}\n\nSkipping the post-processing step due to the error above. You can "
+            "still use SAM 2 and it's OK to ignore the error above, although some post-processing "
+            "functionality may be limited (which doesn't affect the results in most cases; see "
             "https://github.com/facebookresearch/segment-anything-2/blob/main/INSTALL.md).",
             category=UserWarning,
             stacklevel=2,

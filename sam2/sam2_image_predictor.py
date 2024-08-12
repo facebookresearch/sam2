@@ -77,7 +77,7 @@ class SAM2ImagePredictor:
         from sam2.build_sam import build_sam2_hf
 
         sam_model = build_sam2_hf(model_id, **kwargs)
-        return cls(sam_model)
+        return sam_model
 
     @torch.no_grad()
     def set_image(

@@ -1,116 +1,116 @@
-# @package _global_
-
-# Model
+# @package _global_  # Global package declaration
+# 
+# Model  # Model architecture definition
 model:
-  _target_: sam2.modeling.sam2_base.SAM2Base
-  image_encoder:
-    _target_: sam2.modeling.backbones.image_encoder.ImageEncoder
-    scalp: 1
-    trunk:
-      _target_: sam2.modeling.backbones.hieradet.Hiera
-      embed_dim: 96
-      num_heads: 1
-      stages: [1, 2, 11, 2]
-      global_att_blocks: [7, 10, 13]
-      window_pos_embed_bkg_spatial_size: [7, 7]
-    neck:
-      _target_: sam2.modeling.backbones.image_encoder.FpnNeck
-      position_encoding:
-        _target_: sam2.modeling.position_encoding.PositionEmbeddingSine
-        num_pos_feats: 256
-        normalize: true
-        scale: null
-        temperature: 10000
-      d_model: 256
-      backbone_channel_list: [768, 384, 192, 96]
-      fpn_top_down_levels: [2, 3]  # output level 0 and 1 directly use the backbone features
-      fpn_interp_model: nearest
+  _target_: sam2.modeling.sam2_base.SAM2Base  # Base model class
+  image_encoder:  # Image encoder configuration
+    _target_: sam2.modeling.backbones.image_encoder.ImageEncoder  # Image encoder class
+    scalp: 1  # Scaling factor for the image encoder
+    trunk:  # Backbone of the image encoder
+      _target_: sam2.modeling.backbones.hieradet.Hiera  # Backbone class
+      embed_dim: 96  # Embedding dimension for the backbone
+      num_heads: 1  # Number of attention heads in the backbone
+      stages: [1, 2, 11, 2]  # Stages in the backbone network
+      global_att_blocks: [7, 10, 13]  # Global attention blocks in the backbone
+      window_pos_embed_bkg_spatial_size: [7, 7]  # Spatial size for window position embedding
+    neck:  # Feature pyramid network (FPN)
+      _target_: sam2.modeling.backbones.image_encoder.FpnNeck  # FPN class
+      position_encoding:  # Positional encoding for the FPN
+        _target_: sam2.modeling.position_encoding.PositionEmbeddingSine  # Positional encoding class
+        num_pos_feats: 256  # Number of positional features
+        normalize: true  # Normalize positional features
+        scale: null  # Scaling factor for positional features
+        temperature: 10000  # Temperature for positional encoding
+      d_model: 256  # Dimensionality of the FPN features
+      backbone_channel_list: [768, 384, 192, 96]  # Channel list for the backbone
+      fpn_top_down_levels: [2, 3]  # Levels of the FPN that directly use backbone features
+      fpn_interp_model: nearest  # Interpolation method for upsampling in the FPN
 
-  memory_attention:
-    _target_: sam2.modeling.memory_attention.MemoryAttention
-    d_model: 256
-    pos_enc_at_input: true
-    layer:
-      _target_: sam2.modeling.memory_attention.MemoryAttentionLayer
-      activation: relu
-      dim_feedforward: 2048
-      dropout: 0.1
-      pos_enc_at_attn: false
-      self_attention:
-        _target_: sam2.modeling.sam.transformer.RoPEAttention
-        rope_theta: 10000.0
-        feat_sizes: [32, 32]
-        embedding_dim: 256
-        num_heads: 1
-        downsample_rate: 1
-        dropout: 0.1
-      d_model: 256
-      pos_enc_at_cross_attn_keys: true
-      pos_enc_at_cross_attn_queries: false
-      cross_attention:
-        _target_: sam2.modeling.sam.transformer.RoPEAttention
-        rope_theta: 10000.0
-        feat_sizes: [32, 32]
-        rope_k_repeat: True
-        embedding_dim: 256
-        num_heads: 1
-        downsample_rate: 1
-        dropout: 0.1
-        kv_in_dim: 64
-    num_layers: 4
+  memory_attention:  # Memory attention module configuration
+    _target_: sam2.modeling.memory_attention.MemoryAttention  # Memory attention class
+    d_model: 256  # Dimensionality of features in the memory attention
+    pos_enc_at_input: true  # Apply positional encoding at the input
+    layer:  # Layer within the memory attention
+      _target_: sam2.modeling.memory_attention.MemoryAttentionLayer  # Layer class
+      activation: relu  # Activation function used in the layer
+      dim_feedforward: 2048  # Dimensionality of the feedforward network
+      dropout: 0.1  # Dropout rate for the layer
+      pos_enc_at_attn: false  # Apply positional encoding during attention
+      self_attention:  # Self-attention mechanism
+        _target_: sam2.modeling.sam.transformer.RoPEAttention  # Self-attention class
+        rope_theta: 10000.0  # Theta value for Rotary Position Embedding (RoPE)
+        feat_sizes: [32, 32]  # Feature sizes for RoPE
+        embedding_dim: 256  # Embedding dimension for RoPE
+        num_heads: 1  # Number of attention heads
+        downsample_rate: 1  # Downsampling rate
+        dropout: 0.1  # Dropout rate for self-attention
+      d_model: 256  # Dimensionality of the features in the layer
+      pos_enc_at_cross_attn_keys: true  # Apply positional encoding for cross-attention keys
+      pos_enc_at_cross_attn_queries: false  # Apply positional encoding for cross-attention queries
+      cross_attention:  # Cross-attention mechanism
+        _target_: sam2.modeling.sam.transformer.RoPEAttention  # Cross-attention class
+        rope_theta: 10000.0  # Theta value for RoPE in cross-attention
+        feat_sizes: [32, 32]  # Feature sizes for RoPE in cross-attention
+        rope_k_repeat: True  # Repeat keys for RoPE
+        embedding_dim: 256  # Embedding dimension for RoPE in cross-attention
+        num_heads: 1  # Number of attention heads in cross-attention
+        downsample_rate: 1  # Downsampling rate in cross-attention
+        dropout: 0.1  # Dropout rate for cross-attention
+        kv_in_dim: 64  # Dimensionality of key and value inputs for cross-attention
+    num_layers: 4  # Number of layers in the memory attention module
 
-  memory_encoder:
-      _target_: sam2.modeling.memory_encoder.MemoryEncoder
-      out_dim: 64
-      position_encoding:
-        _target_: sam2.modeling.position_encoding.PositionEmbeddingSine
-        num_pos_feats: 64
-        normalize: true
-        scale: null
-        temperature: 10000
-      mask_downsampler:
-        _target_: sam2.modeling.memory_encoder.MaskDownSampler
-        kernel_size: 3
-        stride: 2
-        padding: 1
-      fuser:
-        _target_: sam2.modeling.memory_encoder.Fuser
-        layer:
-          _target_: sam2.modeling.memory_encoder.CXBlock
-          dim: 256
-          kernel_size: 7
-          padding: 3
-          layer_scale_init_value: 1e-6
-          use_dwconv: True  # depth-wise convs
-        num_layers: 2
+  memory_encoder:  # Memory encoder configuration
+    _target_: sam2.modeling.memory_encoder.MemoryEncoder  # Memory encoder class
+    out_dim: 64  # Dimensionality of the output from the memory encoder
+    position_encoding:  # Positional encoding for the memory encoder
+      _target_: sam2.modeling.position_encoding.PositionEmbeddingSine  # Positional encoding class
+      num_pos_feats: 64  # Number of positional features
+      normalize: true  # Normalize positional features
+      scale: null  # Scaling factor for positional features
+      temperature: 10000  # Temperature for positional encoding
+    mask_downsampler:  # Mask downsampler configuration
+      _target_: sam2.modeling.memory_encoder.MaskDownSampler  # Mask downsampler class
+      kernel_size: 3  # Kernel size for downsampling
+      stride: 2  # Stride for downsampling
+      padding: 1  # Padding for downsampling
+    fuser:  # Feature fuser configuration
+      _target_: sam2.modeling.memory_encoder.Fuser  # Feature fuser class
+      layer:  # Layer within the fuser
+        _target_: sam2.modeling.memory_encoder.CXBlock  # Layer class
+        dim: 256  # Dimensionality of the layer
+        kernel_size: 7  # Kernel size for the layer
+        padding: 3  # Padding for the layer
+        layer_scale_init_value: 1e-6  # Initial value for layer scaling
+        use_dwconv: True  # Use depthwise convolution
+      num_layers: 2  # Number of layers in the fuser
 
-  num_maskmem: 7
-  image_size: 1024
+  num_maskmem: 7  # Number of memory slots for storing masks
+  image_size: 1024  # Expected input image size
   # apply scaled sigmoid on mask logits for memory encoder, and directly feed input mask as output mask
-  sigmoid_scale_for_mem_enc: 20.0
-  sigmoid_bias_for_mem_enc: -10.0
-  use_mask_input_as_output_without_sam: true
+  sigmoid_scale_for_mem_enc: 20.0  # Scaling factor for sigmoid in the memory encoder
+  sigmoid_bias_for_mem_enc: -10.0  # Bias term for sigmoid in the memory encoder
+  use_mask_input_as_output_without_sam: true  # Use input mask directly as output without SAM processing
   # Memory
-  directly_add_no_mem_embed: true
+  directly_add_no_mem_embed: true  # Add non-memory embeddings directly
   # use high-resolution feature map in the SAM mask decoder
-  use_high_res_features_in_sam: true
+  use_high_res_features_in_sam: true  # Use high-resolution features in SAM
   # output 3 masks on the first click on initial conditioning frames
-  multimask_output_in_sam: true
+  multimask_output_in_sam: true  # Output multiple masks in SAM
   # SAM heads
-  iou_prediction_use_sigmoid: True
+  iou_prediction_use_sigmoid: True  # Use sigmoid for IoU prediction
   # cross-attend to object pointers from other frames (based on SAM output tokens) in the encoder
-  use_obj_ptrs_in_encoder: true
-  add_tpos_enc_to_obj_ptrs: false
-  only_obj_ptrs_in_the_past_for_eval: true
+  use_obj_ptrs_in_encoder: true  # Use object pointers in the encoder
+  add_tpos_enc_to_obj_ptrs: false  # Add temporal positional encoding to object pointers
+  only_obj_ptrs_in_the_past_for_eval: true  # Only use past object pointers for evaluation
   # object occlusion prediction
-  pred_obj_scores: true
-  pred_obj_scores_mlp: true
-  fixed_no_obj_ptr: true
+  pred_obj_scores: true  # Predict object scores
+  pred_obj_scores_mlp: true  # Use MLP for object score prediction
+  fixed_no_obj_ptr: true  # Use a fixed object pointer for "no object"
   # multimask tracking settings
-  multimask_output_for_tracking: true
-  use_multimask_token_for_obj_ptr: true
-  multimask_min_pt_num: 0
-  multimask_max_pt_num: 1
-  use_mlp_for_obj_ptr_proj: true
+  multimask_output_for_tracking: true  # Output multiple masks for tracking
+  use_multimask_token_for_obj_ptr: true  # Use multi-mask tokens for object pointers
+  multimask_min_pt_num: 0  # Minimum number of points for multi-mask
+  multimask_max_pt_num: 1  # Maximum number of points for multi-mask
+  use_mlp_for_obj_ptr_proj: true  # Use MLP for object pointer projection
   # Compilation flag
-  compile_image_encoder: False
+  compile_image_encoder: False  # Flag for compiling the image encoder

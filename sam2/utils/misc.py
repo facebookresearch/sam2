@@ -68,7 +68,7 @@ def mask_to_box(masks: torch.Tensor):
     compute bounding box given an input mask
 
     Inputs:
-    - masks: [B, 1, H, W] boxes, dtype=torch.Tensor
+    - masks: [B, 1, H, W] masks, dtype=torch.Tensor
 
     Returns:
     - box_coords: [B, 1, 4], contains (x, y) coordinates of top left and bottom right box corners, dtype=torch.Tensor
@@ -120,7 +120,7 @@ class AsyncVideoFrameLoader:
         self.offload_video_to_cpu = offload_video_to_cpu
         self.img_mean = img_mean
         self.img_std = img_std
-        # items in `self._images` will be loaded asynchronously
+        # items in `self.images` will be loaded asynchronously
         self.images = [None] * len(img_paths)
         # catch and raise any exceptions in the async loading thread
         self.exception = None

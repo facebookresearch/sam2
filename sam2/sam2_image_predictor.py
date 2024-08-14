@@ -183,7 +183,7 @@ class SAM2ImagePredictor:
         normalize_coords=True,
     ) -> Tuple[List[np.ndarray], List[np.ndarray], List[np.ndarray]]:
         """This function is very similar to predict(...), however it is used for batched mode, when the model is expected to generate predictions on multiple images.
-        It returns a tupele of lists of masks, ious, and low_res_masks_logits.
+        It returns a tuple of lists of masks, ious, and low_res_masks_logits.
         """
         assert self._is_batch, "This function should only be used when in batched mode"
         if not self._is_image_set:

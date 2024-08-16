@@ -70,6 +70,7 @@ def get_extensions():
                 "-D__CUDA_NO_HALF_OPERATORS__",
                 "-D__CUDA_NO_HALF_CONVERSIONS__",
                 "-D__CUDA_NO_HALF2_OPERATORS__",
+                "-allow-unsupported-compiler"
             ],
         }
         ext_modules = [CUDAExtension("sam2._C", srcs, extra_compile_args=compile_args)]

@@ -397,6 +397,13 @@ class SAM2ImagePredictor:
             # we merge "boxes" and "points" into a single "concat_points" input (where
             # boxes are added at the beginning) to sam_prompt_encoder
             if concat_points is not None:
+                if box_coords.size(0) > 1 or box_labels.size(0) > 1:
+                    logger.warning("If you use a combination of box and point as a prompt, only a single "
+                                   "combination is supported. Automatically uses only the first combination.")
+                    concat_points = (concat_points[0][:, :1, :], concat_points[1][:, :1])
+                    box_labels = box_labels[:1]
+                    box_coords = box_coords[:1]
+
                 concat_coords = torch.cat([box_coords, concat_points[0]], dim=1)
                 concat_labels = torch.cat([box_labels, concat_points[1]], dim=1)
                 concat_points = (concat_coords, concat_labels)

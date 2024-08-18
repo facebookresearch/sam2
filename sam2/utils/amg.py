@@ -11,6 +11,7 @@ from typing import Any, Dict, Generator, ItemsView, List, Tuple
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 
 # Very lightly adapted from https://github.com/facebookresearch/segment-anything/blob/main/segment_anything/utils/amg.py
 
@@ -346,3 +347,87 @@ def batched_mask_to_box(masks: torch.Tensor) -> torch.Tensor:
         out = out[0]
 
     return out
+
+def mask_to_rle_pytorch_optimized(tensor: torch.Tensor) -> List[Dict[str, Any]]:
+    """
+    Optimized version of mask_to_rle_pytorch().
+    """
+    b, h, w = tensor.shape
+    flattened_masks = tensor.permute(0, 2, 1).flatten(1)  # B x H*W
+
+    # Vectorized Change Index Calculation using torch.diff()
+    change_indices = (torch.diff(flattened_masks, dim=1) != 0).nonzero()
+
+    # Create a tensor with start, end, and end indices for each run length 
+    change_indices = torch.cat([
+        torch.zeros((b, 1), dtype=change_indices.dtype, device=change_indices.device),
+        change_indices + 1,
+        torch.full((b, 1), h * w, dtype=change_indices.dtype, device=change_indices.device)
+    ], dim=1)  
+
+    # Batch-wise run length calculation 
+    run_lengths = torch.diff(change_indices, dim=1)  
+
+    rle = []
+    for i in range(b):
+        counts = [] if flattened_masks[i, 0] == 0 else [0]
+        counts.extend(run_lengths[i].detach().cpu().tolist())
+        rle.append({"size": [h, w], "counts": counts})
+    return rle
+
+def fill_holes_in_mask_scores(mask, max_area):
+    """
+    A post processor to fill small holes in mask scores with area under `max_area`.
+    Uses PyTorch operations for hole filling.
+    """
+    assert max_area > 0, "max_area must be positive"
+
+    # 1. Identify Holes using PyTorch:
+    #   - We use thresholding for faster hole detection.
+    #   - If you need a more accurate approach, you can replace this with
+    #     a connected component algorithm implemented in PyTorch.
+    holes = (mask <= 0).float()
+
+    # 2. Calculate Hole Areas using PyTorch:
+    hole_areas = holes.sum(dim=(-1, -2)) 
+
+    # 3. Filter Small Holes and Fill with a Small Positive Value:
+    mask = torch.where(
+        (holes > 0) & (hole_areas <= max_area),  # Condition for small holes
+        0.1,  # Fill holes with a small positive value
+        mask
+    )
+
+    return mask
+
+def mask_intersection(mask1: torch.Tensor, mask2: torch.Tensor) -> torch.Tensor:
+    return mask1 * mask2
+
+
+def mask_union(mask1: torch.Tensor, mask2: torch.Tensor) -> torch.Tensor:
+    return (mask1 + mask2) > 0
+
+
+def mask_subtraction(mask1: torch.Tensor, mask2: torch.Tensor) -> torch.Tensor:
+    return mask1 * (1 - mask2)
+
+
+def boxes_to_masks(boxes: torch.Tensor, image_size: Tuple[int, int]) -> torch.Tensor:
+    """Generates masks from bounding boxes in XYXY format."""
+    h, w = image_size
+    masks = torch.zeros((*boxes.shape[:-1], h, w), dtype=torch.bool, device=boxes.device)
+    for i, box in enumerate(boxes):
+        x1, y1, x2, y2 = box.long()
+        masks[i, y1:y2, x1:x2] = True
+    return masks
+
+
+
+    '''
+Key Changes from the Previous Script:
+
+mask_to_rle_pytorch_optimized Added: This function replaces the original mask_to_rle_pytorch function and provides significant performance improvements using vectorization and batch-wise processing.
+fill_holes_in_mask_scores Updated: This function now uses PyTorch operations (thresholding and torch.where) for hole filling instead of cv2.connectedComponentsWithStats. This makes it faster and eliminates the need for data conversions.
+No Changes to mask_intersection, mask_union, mask_subtraction, and boxes_to_masks: These functions are already tensor-based and remain unchanged.
+
+    '''

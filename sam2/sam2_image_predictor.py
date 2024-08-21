@@ -462,23 +462,42 @@ class SAM2ImagePredictor:
         if export_to_onnx:
             #print("concat_points", concat_points.shape)
             #print("mask_input", mask_input.shape)
+            self.model.sam_prompt_encoder.forward = self.model.sam_prompt_encoder.forward_sparse
             torch.onnx.export(
-                self.model.sam_prompt_encoder, (concat_points[0], concat_points[1], mask_input), 'prompt_encoder_'+model_id+'.onnx',
-                input_names=["coords", "labels", "mask_input"],
+                self.model.sam_prompt_encoder, (concat_points[0], concat_points[1]), 'prompt_encoder_sparse_'+model_id+'.onnx',
+                input_names=["coords", "labels"],
                 output_names=["sparse_embeddings", "dense_embeddings"],
                 dynamic_axes={
-                    'coords': {1: 'n'},
-                    'labels': {1: 'n'},
+                    'coords': {0: 'b', 1: 'n'},
+                    'labels': {0: 'b', 1: 'n'},
                 },
                 verbose=False, opset_version=17
             )
+
+            import onnxruntime
+            model = onnxruntime.InferenceSession("prompt_encoder_sparse_hiera_l.onnx")
+            sparse_embeddings, dense_embeddings = model.run(None, {"coords":concat_points[0].numpy(), "labels":concat_points[1].numpy()})
+
+            #self.model.sam_prompt_encoder.forward = self.model.sam_prompt_encoder.forward_dense
+            #if mask_input is None:
+            #    mask_input_non_zero = np.zeros((1, 1024, 1024))
+            #else:
+            #    mask_input_non_zero = mask_input
+            #torch.onnx.export(
+            #    self.model.sam_prompt_encoder, (mask_input_non_zero), 'prompt_encoder_dense_'+model_id+'.onnx',
+            #    input_names=["mask_input"],
+            #    output_names=["sparse_embeddings", "dense_embeddings"],
+            #    verbose=False, opset_version=17
+            #)
+
         if export_to_tflite:
             import ai_edge_torch
-            sample_inputs = (concat_points[0], concat_points[1], mask_input)
+            sample_inputs = (concat_points[0], concat_points[1])
+            self.model.sam_prompt_encoder.forward = self.model.sam_prompt_encoder.forward_sparse
             edge_model = ai_edge_torch.convert(self.model.sam_prompt_encoder, sample_inputs)
-            edge_model.export("prompt_encoder_"+model_id+".tflite")
+            edge_model.export("prompt_encoder_sparse_"+model_id+".tflite")
         if True:
-            sparse_embeddings, dense_embeddings = self.model.sam_prompt_encoder(
+            sparse_embeddings, dense_embeddings = self.model.sam_prompt_encoder.forward_normal(
                 coords=concat_points[0],
                 labels=concat_points[1],
                 #boxes=None,

@@ -92,8 +92,14 @@ class PromptEncoder(nn.Module):
         point_embedding = self.pe_layer.forward_with_coords(
             points, self.input_image_size
         )
-        point_embedding[labels == -1] = 0.0
-        point_embedding[labels == -1] += self.not_a_point_embed.weight
+
+        # こっちだとonnxでbroadcast error
+        #point_embedding[labels == -1] = 0.0
+        #point_embedding[labels == -1] += self.not_a_point_embed.weight
+
+        # こっちだと動く
+        point_embedding[labels == -1] = self.not_a_point_embed.weight
+        
         point_embedding[labels == 0] += self.point_embeddings[0].weight
         point_embedding[labels == 1] += self.point_embeddings[1].weight
         point_embedding[labels == 2] += self.point_embeddings[2].weight
@@ -135,7 +141,7 @@ class PromptEncoder(nn.Module):
     def _get_device(self) -> torch.device:
         return self.point_embeddings[0].weight.device
 
-    def forward(
+    def forward_normal(
         self,
         coords: Optional[torch.Tensor],
         labels: Optional[torch.Tensor],
@@ -173,4 +179,35 @@ class PromptEncoder(nn.Module):
                 bs, -1, self.image_embedding_size[0], self.image_embedding_size[1]
             )
 
+        return sparse_embeddings, dense_embeddings
+
+    def forward_sparse(
+        self,
+        coords: torch.Tensor,
+        labels: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        bs = coords.shape[0]
+        
+        sparse_embeddings = torch.empty(
+            (bs, 0, self.embed_dim), device=self._get_device()
+        )
+
+        point_embeddings = self._embed_points(coords, labels, pad=True)
+        sparse_embeddings = torch.cat([sparse_embeddings, point_embeddings], dim=1)
+
+        dense_embeddings = self.no_mask_embed.weight.reshape(1, -1, 1, 1).expand(
+            bs, -1, self.image_embedding_size[0], self.image_embedding_size[1]
+        )
+
+        return sparse_embeddings, dense_embeddings
+    
+    def forward_dense(
+        self,
+        masks: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        bs = masks.shape[0]
+        sparse_embeddings = torch.empty(
+            (bs, 0, self.embed_dim), device=self._get_device()
+        )
+        dense_embeddings = self._embed_masks(masks)
         return sparse_embeddings, dense_embeddings

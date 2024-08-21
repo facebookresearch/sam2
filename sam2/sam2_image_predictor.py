@@ -467,8 +467,8 @@ class SAM2ImagePredictor:
                 input_names=["coords", "labels", "mask_input"],
                 output_names=["sparse_embeddings", "dense_embeddings"],
                 dynamic_axes={
-                    'coords': {0: 'n'},
-                    'labels': {0: 'n'},
+                    'coords': {1: 'n'},
+                    'labels': {1: 'n'},
                 },
                 verbose=False, opset_version=17
             )

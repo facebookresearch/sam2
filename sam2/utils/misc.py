@@ -5,6 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 import os
+import re
 import warnings
 from threading import Thread
 
@@ -99,6 +100,13 @@ def _load_img_as_tensor(img_path, image_size):
     img = torch.from_numpy(img_np).permute(2, 0, 1)
     video_width, video_height = img_pil.size  # the original video size
     return img, video_height, video_width
+
+
+def _extract_numeric(filename):
+    # Extract the numeric part from the filename using regex
+    match = re.search(r"\d+", filename)
+    # Return the numeric part as an integer, default to 0 if not found
+    return int(match.group()) if match else 0
 
 
 class AsyncVideoFrameLoader:
@@ -204,7 +212,7 @@ def load_video_frames(
         for p in os.listdir(jpg_folder)
         if os.path.splitext(p)[-1] in [".jpg", ".jpeg", ".JPG", ".JPEG"]
     ]
-    frame_names.sort(key=lambda p: int(os.path.splitext(p)[0]))
+    frame_names.sort(key=lambda p: _extract_numeric(os.path.splitext(p)[0]))
     num_frames = len(frame_names)
     if num_frames == 0:
         raise RuntimeError(f"no images found in {jpg_folder}")

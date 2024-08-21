@@ -126,9 +126,39 @@ class SAM2ImagePredictor:
             )
         if export_to_tflite:
             import ai_edge_torch
+            import tensorflow as tf
             sample_inputs = (input_image,)
-            edge_model = ai_edge_torch.convert(self.model, sample_inputs)
-            edge_model.export("image_encoder.tflite")
+
+            export_float = False
+            export_int8 = True
+
+            if export_float:
+                tfl_converter_flags = {'target_spec': {'supported_ops': [tf.lite.OpsSet.TFLITE_BUILTINS, tf.lite.OpsSet.SELECT_TF_OPS]}}
+                edge_model = ai_edge_torch.convert(self.model, sample_inputs, _ai_edge_converter_flags=tfl_converter_flags)
+                edge_model.export("image_encoder.tflite")
+
+            if export_int8:
+                from ai_edge_torch.quantize import pt2e_quantizer
+                from ai_edge_torch.quantize import quant_config
+                from torch.ao.quantization import quantize_pt2e
+
+                quantizer = pt2e_quantizer.PT2EQuantizer().set_global(
+                    pt2e_quantizer.get_symmetric_quantization_config()
+                )
+                model = torch._export.capture_pre_autograd_graph(self.model, sample_inputs)
+                model = quantize_pt2e.prepare_pt2e(model, quantizer)
+                #model(input_image.type(torch.FloatTensor)) # calibration           
+                model = quantize_pt2e.convert_pt2e(model, fold_quantize=False)
+
+                tfl_converter_flags = {'target_spec': {'supported_ops': [tf.lite.OpsSet.TFLITE_BUILTINS, tf.lite.OpsSet.SELECT_TF_OPS]}}
+                with_quantizer = ai_edge_torch.convert(
+                    model,
+                    sample_inputs,
+                    quant_config=quant_config.QuantConfig(pt2e_quantizer=quantizer),
+                    _ai_edge_converter_flags=tfl_converter_flags
+                )
+                with_quantizer.export("image_encoder_int8.tflite")
+
         if True:
             backbone_out = self.model.forward_image(input_image)
             _, vision_feats, _, _ = self.model._prepare_backbone_features(backbone_out)

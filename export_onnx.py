@@ -8,12 +8,13 @@ from PIL import Image
 
 # %%
 # select the device for computation
-if torch.cuda.is_available():
+if False:#torch.cuda.is_available():
     device = torch.device("cuda")
 #elif torch.backends.mps.is_available(): # low accuracy
 #    device = torch.device("mps")
 else:
     device = torch.device("cpu")
+    #  Require PJRT_DEVICE=CPU for tflite
 print(f"using device: {device}")
 
 if device.type == "cuda":

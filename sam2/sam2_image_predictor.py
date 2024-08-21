@@ -475,7 +475,7 @@ class SAM2ImagePredictor:
             )
 
             import onnxruntime
-            model = onnxruntime.InferenceSession("prompt_encoder_sparse_hiera_l.onnx")
+            model = onnxruntime.InferenceSession("prompt_encoder_sparse_"+model_id+".onnx")
             sparse_embeddings, dense_embeddings = model.run(None, {"coords":concat_points[0].numpy(), "labels":concat_points[1].numpy()})
 
             #self.model.sam_prompt_encoder.forward = self.model.sam_prompt_encoder.forward_dense
@@ -516,18 +516,27 @@ class SAM2ImagePredictor:
             print("sparse_embeddings", sparse_embeddings.shape)
             print("dense_embeddings", dense_embeddings.shape)
             torch.onnx.export(
-                self.model.sam_mask_decoder, (self._features["image_embed"][img_idx].unsqueeze(0), self.model.sam_prompt_encoder.get_dense_pe(), sparse_embeddings, dense_embeddings, multimask_output, batched_mode, high_res_features),
+                self.model.sam_mask_decoder, (self._features["image_embed"][img_idx].unsqueeze(0), self.model.sam_prompt_encoder.get_dense_pe(), sparse_embeddings, dense_embeddings, multimask_output, batched_mode, high_res_features[0], high_res_features[1]),
                 'mask_decoder_'+model_id+'.onnx',
-                input_names=["image_embeddings", "image_pe", "sparse_prompt_embeddings", "dense_prompt_embeddings", "multimask_output", "repeat_image", "high_res_features"],
+                input_names=["image_embeddings", "image_pe", "sparse_prompt_embeddings", "dense_prompt_embeddings", "multimask_output", "repeat_image", "high_res_features1", "high_res_features2"],
                 output_names=["low_res_masks", "iou_predictions"],
                 #dynamic_axes={
                 #    'unnorm_coords': {2: 'width', 3: 'height'}
                 #},
                 verbose=False, opset_version=17
             )
+            import onnxruntime
+            model = onnxruntime.InferenceSession("mask_decoder_"+model_id+".onnx")
+            low_res_masks, iou_predictions, _, _  = model.run(None, {
+                "image_embeddings":self._features["image_embed"][img_idx].unsqueeze(0).numpy(),
+                "image_pe": self.model.sam_prompt_encoder.get_dense_pe().numpy(),
+                "sparse_prompt_embeddings": sparse_embeddings.numpy(),
+                "dense_prompt_embeddings": dense_embeddings.numpy(),
+                "high_res_features1":high_res_features[0].numpy(),
+                "high_res_features2":high_res_features[1].numpy()})
         if export_to_tflite:
             import ai_edge_torch
-            sample_inputs = (self._features["image_embed"][img_idx].unsqueeze(0), self.model.sam_prompt_encoder.get_dense_pe(), sparse_embeddings, dense_embeddings, multimask_output, batched_mode, high_res_features,)
+            sample_inputs = (self._features["image_embed"][img_idx].unsqueeze(0), self.model.sam_prompt_encoder.get_dense_pe(), sparse_embeddings, dense_embeddings, multimask_output, batched_mode, high_res_features[0], high_res_features[1])
             edge_model = ai_edge_torch.convert(self.model.sam_mask_decoder, sample_inputs)
             edge_model.export("mask_decoder_"+model_id+".tflite")
         if True:
@@ -538,7 +547,8 @@ class SAM2ImagePredictor:
                 dense_prompt_embeddings=dense_embeddings,
                 multimask_output=multimask_output,
                 repeat_image=batched_mode,
-                high_res_features=high_res_features,
+                high_res_features1=high_res_features[0],
+                high_res_features2=high_res_features[1],
             )
 
         # Upscale the masks to the original image resolution

@@ -80,7 +80,7 @@ def show_masks(image, masks, scores, point_coords=None, box_coords=None, input_l
 # %% [markdown]
 # ## Example image
 
-show = False
+show = True
 
 # %%
 image = Image.open('notebooks/images/truck.jpg')
@@ -114,10 +114,12 @@ predictor = SAM2ImagePredictor(sam2_model)
 # Process the image to produce an image embedding by calling `SAM2ImagePredictor.set_image`. `SAM2ImagePredictor` remembers this embedding and will use it for subsequent mask prediction.
 
 # %%
-export_to_onnx = True
+model_id = "hiera_l"
+
+export_to_onnx = False
 export_to_tflite = False
 
-predictor.set_image(image, export_to_onnx = export_to_onnx, export_to_tflite = export_to_tflite)
+predictor.set_image(image, export_to_onnx = export_to_onnx, export_to_tflite = export_to_tflite, model_id = model_id)
 
 export_to_onnx = True
 export_to_tflite = False
@@ -149,7 +151,8 @@ masks, scores, logits = predictor.predict(
     point_labels=input_label,
     multimask_output=True,
     export_to_onnx=export_to_onnx,
-    export_to_tflite=export_to_tflite
+    export_to_tflite=export_to_tflite,
+    model_id=model_id
 )
 sorted_ind = np.argsort(scores)[::-1]
 masks = masks[sorted_ind]

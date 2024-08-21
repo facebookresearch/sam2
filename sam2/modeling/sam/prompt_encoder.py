@@ -118,17 +118,15 @@ class PromptEncoder(nn.Module):
 
     def _get_batch_size(
         self,
-        points: Optional[Tuple[torch.Tensor, torch.Tensor]],
-        boxes: Optional[torch.Tensor],
+        coords: Optional[torch.Tensor],
+        labels: Optional[torch.Tensor],
         masks: Optional[torch.Tensor],
     ) -> int:
         """
         Gets the batch size of the output given the batch size of the input prompts.
         """
-        if points is not None:
-            return points[0].shape[0]
-        elif boxes is not None:
-            return boxes.shape[0]
+        if coords is not None and labels is not None:
+            return coords.shape[0]
         elif masks is not None:
             return masks.shape[0]
         else:
@@ -139,8 +137,8 @@ class PromptEncoder(nn.Module):
 
     def forward(
         self,
-        points: Optional[Tuple[torch.Tensor, torch.Tensor]],
-        boxes: Optional[torch.Tensor],
+        coords: Optional[torch.Tensor],
+        labels: Optional[torch.Tensor],
         masks: Optional[torch.Tensor],
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
@@ -160,17 +158,13 @@ class PromptEncoder(nn.Module):
           torch.Tensor: dense embeddings for the masks, in the shape
             Bx(embed_dim)x(embed_H)x(embed_W)
         """
-        bs = self._get_batch_size(points, boxes, masks)
+        bs = self._get_batch_size(coords, labels, masks)
         sparse_embeddings = torch.empty(
             (bs, 0, self.embed_dim), device=self._get_device()
         )
-        if points is not None:
-            coords, labels = points
-            point_embeddings = self._embed_points(coords, labels, pad=(boxes is None))
+        if coords is not None and labels is not None:
+            point_embeddings = self._embed_points(coords, labels, pad=True)
             sparse_embeddings = torch.cat([sparse_embeddings, point_embeddings], dim=1)
-        if boxes is not None:
-            box_embeddings = self._embed_boxes(boxes)
-            sparse_embeddings = torch.cat([sparse_embeddings, box_embeddings], dim=1)
 
         if masks is not None:
             dense_embeddings = self._embed_masks(masks)

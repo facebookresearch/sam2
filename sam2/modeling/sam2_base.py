@@ -211,7 +211,7 @@ class SAM2Base(torch.nn.Module):
             feat.permute(1, 2, 0).view(1, -1, *feat_size)
             for feat, feat_size in zip(vision_feats[::-1], _bb_feat_sizes[::-1])
         ][::-1]
-        return feats[-1], feats[:-1]
+        return feats
         
         #raise NotImplementedError(
         #    "Please use the corresponding methods in SAM2VideoPredictor for inference."

@@ -119,12 +119,9 @@ class SAM2ImagePredictor:
         if export_to_onnx:
             print("input_image", input_image.shape)
             torch.onnx.export(
-                self.model, (input_image), 'forward_image.onnx',
+                self.model, (input_image), 'image_encoder.onnx',
                 input_names=["input_image"],
-                output_names=["feats"],
-                dynamic_axes={
-                    'input_image': {2: 'width', 3: 'height'}
-                },
+                output_names=["feats1", "feats2", "feats3"],
                 verbose=False, opset_version=17
             )
             feats = self.model(input_image)
@@ -300,7 +297,6 @@ class SAM2ImagePredictor:
             )
 
         # Transform input prompts
-
         mask_input, unnorm_coords, labels, unnorm_box = self._prep_prompts(
             point_coords, point_labels, box, mask_input, normalize_coords
         )
@@ -312,6 +308,8 @@ class SAM2ImagePredictor:
             mask_input,
             multimask_output,
             return_logits=return_logits,
+            export_to_onnx=export_to_onnx,
+            export_to_tflite=export_to_tflite
         )
 
         masks_np = masks.squeeze(0).float().detach().cpu().numpy()
@@ -360,6 +358,8 @@ class SAM2ImagePredictor:
         multimask_output: bool = True,
         return_logits: bool = False,
         img_idx: int = -1,
+        export_to_onnx = False,
+        export_to_tflite = False
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Predict masks for the given input prompts, using the currently set image.
@@ -420,11 +420,26 @@ class SAM2ImagePredictor:
             else:
                 concat_points = (box_coords, box_labels)
 
-        sparse_embeddings, dense_embeddings = self.model.sam_prompt_encoder(
-            points=concat_points,
-            boxes=None,
-            masks=mask_input,
-        )
+
+        if export_to_onnx:
+            #print("concat_points", concat_points.shape)
+            #print("mask_input", mask_input.shape)
+            torch.onnx.export(
+                self.model.sam_prompt_encoder, (concat_points, None, mask_input), 'prompt_encoder.onnx',
+                input_names=["concat_points", "mask_input"],
+                output_names=["sparse_embeddings", "dense_embeddings"],
+                dynamic_axes={
+                    'concat_points': {1: 'n'},
+                },
+                verbose=False, opset_version=17
+            )
+            sparse_embeddings, dense_embeddings = self.model.sam_prompt_encoder(concat_points, None, mask_input)
+        else:
+            sparse_embeddings, dense_embeddings = self.model.sam_prompt_encoder(
+                points=concat_points,
+                boxes=None,
+                masks=mask_input,
+            )
 
         # Predict masks
         batched_mode = (
@@ -434,15 +449,30 @@ class SAM2ImagePredictor:
             feat_level[img_idx].unsqueeze(0)
             for feat_level in self._features["high_res_feats"]
         ]
-        low_res_masks, iou_predictions, _, _ = self.model.sam_mask_decoder(
-            image_embeddings=self._features["image_embed"][img_idx].unsqueeze(0),
-            image_pe=self.model.sam_prompt_encoder.get_dense_pe(),
-            sparse_prompt_embeddings=sparse_embeddings,
-            dense_prompt_embeddings=dense_embeddings,
-            multimask_output=multimask_output,
-            repeat_image=batched_mode,
-            high_res_features=high_res_features,
-        )
+        if export_to_onnx:
+            print("sparse_embeddings", sparse_embeddings.shape)
+            print("dense_embeddings", dense_embeddings.shape)
+            torch.onnx.export(
+                self.model.sam_mask_decoder, (self._features["image_embed"][img_idx].unsqueeze(0), self.model.sam_prompt_encoder.get_dense_pe(), sparse_embeddings, dense_embeddings, multimask_output, batched_mode, high_res_features),
+                'mask_decoder.onnx',
+                input_names=["image_embeddings", "image_pe", "sparse_prompt_embeddings", "dense_prompt_embeddings", "multimask_output", "repeat_image", "high_res_features"],
+                output_names=["low_res_masks", "iou_predictions"],
+                #dynamic_axes={
+                #    'unnorm_coords': {2: 'width', 3: 'height'}
+                #},
+                verbose=False, opset_version=17
+            )
+            low_res_masks, iou_predictions, _, _ = self.model.sam_mask_decoder(self._features["image_embed"][img_idx].unsqueeze(0), self.model.sam_prompt_encoder.get_dense_pe(), sparse_embeddings, dense_embeddings, multimask_output, batched_mode, high_res_features)
+        else:
+            low_res_masks, iou_predictions, _, _ = self.model.sam_mask_decoder(
+                image_embeddings=self._features["image_embed"][img_idx].unsqueeze(0),
+                image_pe=self.model.sam_prompt_encoder.get_dense_pe(),
+                sparse_prompt_embeddings=sparse_embeddings,
+                dense_prompt_embeddings=dense_embeddings,
+                multimask_output=multimask_output,
+                repeat_image=batched_mode,
+                high_res_features=high_res_features,
+            )
 
         # Upscale the masks to the original image resolution
         masks = self._transforms.postprocess_masks(

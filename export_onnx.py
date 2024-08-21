@@ -115,7 +115,11 @@ predictor = SAM2ImagePredictor(sam2_model)
 # %%
 export_to_onnx = True
 export_to_tflite = False
+
 predictor.set_image(image, export_to_onnx = export_to_onnx, export_to_tflite = export_to_tflite)
+
+export_to_onnx = True
+export_to_tflite = False
 
 # %% [markdown]
 # To select the truck, choose a point on it. Points are input to the model in (x,y) format and come with labels 1 (foreground point) or 0 (background point). Multiple points can be input; here we use only one. The chosen point will be shown as a star on the image.
@@ -160,3 +164,5 @@ masks.shape  # (number_of_masks) x H x W
 # %%
 if show:
     show_masks(image, masks, scores, point_coords=input_point, input_labels=input_label, borders=True)
+
+print("Success!")

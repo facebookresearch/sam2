@@ -86,6 +86,8 @@ class SAM2ImagePredictor:
     def set_image(
         self,
         image: Union[np.ndarray, Image],
+        export_to_onnx = False,
+        export_to_tflite = False
     ) -> None:
         """
         Calculates the image embeddings for the provided image, allowing
@@ -114,16 +116,29 @@ class SAM2ImagePredictor:
             len(input_image.shape) == 4 and input_image.shape[1] == 3
         ), f"input_image must be of size 1x3xHxW, got {input_image.shape}"
         logging.info("Computing image embeddings for the provided image...")
-        backbone_out = self.model.forward_image(input_image)
-        _, vision_feats, _, _ = self.model._prepare_backbone_features(backbone_out)
-        # Add no_mem_embed, which is added to the lowest rest feat. map during training on videos
-        if self.model.directly_add_no_mem_embed:
-            vision_feats[-1] = vision_feats[-1] + self.model.no_mem_embed
+        if export_to_onnx:
+            print("input_image", input_image.shape)
+            torch.onnx.export(
+                self.model, (input_image), 'forward_image.onnx',
+                input_names=["input_image"],
+                output_names=["feats"],
+                dynamic_axes={
+                    'input_image': {2: 'width', 3: 'height'}
+                },
+                verbose=False, opset_version=17
+            )
+            feats = self.model(input_image)
+        else:
+            backbone_out = self.model.forward_image(input_image)
+            _, vision_feats, _, _ = self.model._prepare_backbone_features(backbone_out)
+            # Add no_mem_embed, which is added to the lowest rest feat. map during training on videos
+            if self.model.directly_add_no_mem_embed:
+                vision_feats[-1] = vision_feats[-1] + self.model.no_mem_embed
 
-        feats = [
-            feat.permute(1, 2, 0).view(1, -1, *feat_size)
-            for feat, feat_size in zip(vision_feats[::-1], self._bb_feat_sizes[::-1])
-        ][::-1]
+            feats = [
+                feat.permute(1, 2, 0).view(1, -1, *feat_size)
+                for feat, feat_size in zip(vision_feats[::-1], self._bb_feat_sizes[::-1])
+            ][::-1]
         self._features = {"image_embed": feats[-1], "high_res_feats": feats[:-1]}
         self._is_image_set = True
         logging.info("Image embeddings computed.")
@@ -243,6 +258,8 @@ class SAM2ImagePredictor:
         multimask_output: bool = True,
         return_logits: bool = False,
         normalize_coords=True,
+        export_to_onnx=False,
+        export_to_tflite=False
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Predict masks for the given input prompts, using the currently set image.

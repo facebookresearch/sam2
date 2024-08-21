@@ -192,11 +192,31 @@ class SAM2Base(torch.nn.Module):
     def device(self):
         return next(self.parameters()).device
 
-    def forward(self, *args, **kwargs):
-        raise NotImplementedError(
-            "Please use the corresponding methods in SAM2VideoPredictor for inference."
-            "See notebooks/video_predictor_example.ipynb for an example."
-        )
+    def forward(self, input_image):
+        backbone_out = self.forward_image(input_image)
+        _, vision_feats, _, _ = self._prepare_backbone_features(backbone_out)
+
+        # Add no_mem_embed, which is added to the lowest rest feat. map during training on videos
+        if self.directly_add_no_mem_embed:
+            vision_feats[-1] = vision_feats[-1] + self.no_mem_embed
+
+        # Spatial dim for backbone feature maps
+        _bb_feat_sizes = [
+            (256, 256),
+            (128, 128),
+            (64, 64),
+        ]
+
+        feats = [
+            feat.permute(1, 2, 0).view(1, -1, *feat_size)
+            for feat, feat_size in zip(vision_feats[::-1], _bb_feat_sizes[::-1])
+        ][::-1]
+        return feats[-1], feats[:-1]
+        
+        #raise NotImplementedError(
+        #    "Please use the corresponding methods in SAM2VideoPredictor for inference."
+        #    "See notebooks/video_predictor_example.ipynb for an example."
+        #)
 
     def _build_sam_heads(self):
         """Build SAM-style prompt encoder and mask decoder."""

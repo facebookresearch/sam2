@@ -124,8 +124,12 @@ class SAM2ImagePredictor:
                 output_names=["feats1", "feats2", "feats3"],
                 verbose=False, opset_version=17
             )
-            feats = self.model(input_image)
-        else:
+        if export_to_tflite:
+            import ai_edge_torch
+            sample_inputs = (input_image,)
+            edge_model = ai_edge_torch.convert(self.model, sample_inputs)
+            edge_model.export("image_encoder.tflite")
+        if True:
             backbone_out = self.model.forward_image(input_image)
             _, vision_feats, _, _ = self.model._prepare_backbone_features(backbone_out)
             # Add no_mem_embed, which is added to the lowest rest feat. map during training on videos
@@ -433,8 +437,12 @@ class SAM2ImagePredictor:
                 },
                 verbose=False, opset_version=17
             )
-            sparse_embeddings, dense_embeddings = self.model.sam_prompt_encoder(concat_points, None, mask_input)
-        else:
+        if export_to_tflite:
+            import ai_edge_torch
+            sample_inputs = (concat_points, None, mask_input)
+            edge_model = ai_edge_torch.convert(self.model.sam_prompt_encoder, sample_inputs)
+            edge_model.export("prompt_encoder.tflite")
+        if True:
             sparse_embeddings, dense_embeddings = self.model.sam_prompt_encoder(
                 points=concat_points,
                 boxes=None,
@@ -462,8 +470,12 @@ class SAM2ImagePredictor:
                 #},
                 verbose=False, opset_version=17
             )
-            low_res_masks, iou_predictions, _, _ = self.model.sam_mask_decoder(self._features["image_embed"][img_idx].unsqueeze(0), self.model.sam_prompt_encoder.get_dense_pe(), sparse_embeddings, dense_embeddings, multimask_output, batched_mode, high_res_features)
-        else:
+        if export_to_tflite:
+            import ai_edge_torch
+            sample_inputs = (self._features["image_embed"][img_idx].unsqueeze(0), self.model.sam_prompt_encoder.get_dense_pe(), sparse_embeddings, dense_embeddings, multimask_output, batched_mode, high_res_features,)
+            edge_model = ai_edge_torch.convert(self.model.sam_mask_decoder, sample_inputs)
+            edge_model.export("mask_decoder.tflite")
+        if True:
             low_res_masks, iou_predictions, _, _ = self.model.sam_mask_decoder(
                 image_embeddings=self._features["image_embed"][img_idx].unsqueeze(0),
                 image_pe=self.model.sam_prompt_encoder.get_dense_pe(),

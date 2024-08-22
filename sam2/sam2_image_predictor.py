@@ -492,7 +492,7 @@ class SAM2ImagePredictor:
             torch.onnx.export(
                 self.model.sam_prompt_encoder, (concat_points[0], concat_points[1]), 'prompt_encoder_sparse_'+model_id+'.onnx',
                 input_names=["coords", "labels"],
-                output_names=["sparse_embeddings", "dense_embeddings"],
+                output_names=["sparse_embeddings", "dense_embeddings", "dense_pe"],
                 dynamic_axes={
                     'coords': {0: 'b', 1: 'n'},
                     'labels': {0: 'b', 1: 'n'},
@@ -502,9 +502,10 @@ class SAM2ImagePredictor:
 
         if import_from_onnx:
             model = onnxruntime.InferenceSession("prompt_encoder_sparse_"+model_id+".onnx")
-            sparse_embeddings, dense_embeddings = model.run(None, {"coords":concat_points[0].numpy(), "labels":concat_points[1].numpy()})
+            sparse_embeddings, dense_embeddings, dense_pe = model.run(None, {"coords":concat_points[0].numpy(), "labels":concat_points[1].numpy()})
             sparse_embeddings = torch.Tensor(sparse_embeddings)
             dense_embeddings = torch.Tensor(dense_embeddings)
+            dense_pe = torch.Tensor(dense_pe)
 
         #if export_to_onnx:
             #self.model.sam_prompt_encoder.forward = self.model.sam_prompt_encoder.forward_dense
@@ -533,6 +534,7 @@ class SAM2ImagePredictor:
                 #boxes=None,
                 masks=mask_input,
             )
+            dense_pe = self.model.sam_prompt_encoder.get_dense_pe()
 
         # Predict masks
         batched_mode = (
@@ -548,7 +550,7 @@ class SAM2ImagePredictor:
 
         if export_to_onnx:
             torch.onnx.export(
-                self.model.sam_mask_decoder, (self._features["image_embed"][img_idx].unsqueeze(0), self.model.sam_prompt_encoder.get_dense_pe(), sparse_embeddings, dense_embeddings, multimask_output, batched_mode, high_res_features[0], high_res_features[1]),
+                self.model.sam_mask_decoder, (self._features["image_embed"][img_idx].unsqueeze(0), dense_pe, sparse_embeddings, dense_embeddings, multimask_output, batched_mode, high_res_features[0], high_res_features[1]),
                 'mask_decoder_'+model_id+'.onnx',
                 input_names=["image_embeddings", "image_pe", "sparse_prompt_embeddings", "dense_prompt_embeddings", "multimask_output", "repeat_image", "high_res_features1", "high_res_features2"],
                 output_names=["low_res_masks", "iou_predictions"],
@@ -559,7 +561,7 @@ class SAM2ImagePredictor:
             model = onnxruntime.InferenceSession("mask_decoder_"+model_id+".onnx")
             low_res_masks, iou_predictions, _, _  = model.run(None, {
                 "image_embeddings":self._features["image_embed"][img_idx].unsqueeze(0).numpy(),
-                "image_pe": self.model.sam_prompt_encoder.get_dense_pe().numpy(),
+                "image_pe": dense_pe.numpy(),
                 "sparse_prompt_embeddings": sparse_embeddings.numpy(),
                 "dense_prompt_embeddings": dense_embeddings.numpy(),
                 "high_res_features1":high_res_features[0].numpy(),
@@ -569,14 +571,14 @@ class SAM2ImagePredictor:
 
         if export_to_tflite:
             import ai_edge_torch
-            sample_inputs = (self._features["image_embed"][img_idx].unsqueeze(0), self.model.sam_prompt_encoder.get_dense_pe(), sparse_embeddings, dense_embeddings, multimask_output, batched_mode, high_res_features[0], high_res_features[1])
+            sample_inputs = (self._features["image_embed"][img_idx].unsqueeze(0), dense_pe, sparse_embeddings, dense_embeddings, multimask_output, batched_mode, high_res_features[0], high_res_features[1])
             edge_model = ai_edge_torch.convert(self.model.sam_mask_decoder, sample_inputs)
             edge_model.export("mask_decoder_"+model_id+".tflite")
 
         if not import_from_onnx and not import_from_tflite:
             low_res_masks, iou_predictions, _, _ = self.model.sam_mask_decoder(
                 image_embeddings=self._features["image_embed"][img_idx].unsqueeze(0),
-                image_pe=self.model.sam_prompt_encoder.get_dense_pe(),
+                image_pe=dense_pe,
                 sparse_prompt_embeddings=sparse_embeddings,
                 dense_prompt_embeddings=dense_embeddings,
                 multimask_output=multimask_output,

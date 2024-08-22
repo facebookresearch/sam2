@@ -1,37 +1,29 @@
 ﻿import os
-# if using Apple MPS, fall back to CPU for unsupported ops
-os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from PIL import Image
 
-# %%
-# select the device for computation
-if False:#torch.cuda.is_available():
-    device = torch.device("cuda")
-#elif torch.backends.mps.is_available(): # low accuracy
-#    device = torch.device("mps")
-else:
-    device = torch.device("cpu")
-    #  Require PJRT_DEVICE=CPU for tflite
-print(f"using device: {device}")
+from sam2.build_sam import build_sam2
+from sam2.sam2_image_predictor import SAM2ImagePredictor
 
-if device.type == "cuda":
-    # use bfloat16 for the entire notebook
-    torch.autocast("cuda", dtype=torch.bfloat16).__enter__()
-    # turn on tfloat32 for Ampere GPUs (https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices)
-    if torch.cuda.get_device_properties(0).major >= 8:
-        torch.backends.cuda.matmul.allow_tf32 = True
-        torch.backends.cudnn.allow_tf32 = True
-elif device.type == "mps":
-    print(
-        "\nSupport for MPS devices is preliminary. SAM 2 is trained with CUDA and might "
-        "give numerically different outputs and sometimes degraded performance on MPS. "
-        "See e.g. https://github.com/pytorch/pytorch/issues/84936 for a discussion."
-    )
+# export settings
+export_to_onnx_image_encoder = False
+export_to_onnx_mask_decoder = False
+export_to_tflite = False
+import_from_onnx = True
+import_from_tflite = False
+show = True
 
-# %%
+# model settings
+sam2_checkpoint = "./checkpoints/sam2_hiera_large.pt"
+model_cfg = "sam2_hiera_l.yaml"
+model_id = "hiera_l"
+
+# use cpu for export
+device = torch.device("cpu")
+
+# utility
 np.random.seed(3)
 
 def show_mask(mask, ax, random_color=False, borders = True):
@@ -77,81 +69,27 @@ def show_masks(image, masks, scores, point_coords=None, box_coords=None, input_l
         plt.axis('off')
         plt.show()
 
-# %% [markdown]
-# ## Example image
-
-show = True
-
-# %%
+# logic
 image = Image.open('notebooks/images/truck.jpg')
 image = np.array(image.convert("RGB"))
-
-# %%
-if False:
-    plt.figure(figsize=(10, 10))
-    plt.imshow(image)
-    plt.axis('on')
-    plt.show()
-
-# %% [markdown]
-# ## Selecting objects with SAM 2
-
-# %% [markdown]
-# First, load the SAM 2 model and predictor. Change the path below to point to the SAM 2 checkpoint. Running on CUDA and using the default model are recommended for best results.
-
-# %%
-from sam2.build_sam import build_sam2
-from sam2.sam2_image_predictor import SAM2ImagePredictor
-
-sam2_checkpoint = "./checkpoints/sam2_hiera_large.pt"
-model_cfg = "sam2_hiera_l.yaml"
 
 sam2_model = build_sam2(model_cfg, sam2_checkpoint, device=device)
 
 predictor = SAM2ImagePredictor(sam2_model)
 
-# %% [markdown]
-# Process the image to produce an image embedding by calling `SAM2ImagePredictor.set_image`. `SAM2ImagePredictor` remembers this embedding and will use it for subsequent mask prediction.
+predictor.set_image(image, export_to_onnx = export_to_onnx_image_encoder, export_to_tflite = export_to_tflite, import_from_onnx = import_from_onnx, import_from_tflite = import_from_tflite, model_id = model_id)
 
-# %%
-model_id = "hiera_l"
-
-export_to_onnx = False
-export_to_tflite = False
-
-predictor.set_image(image, export_to_onnx = export_to_onnx, export_to_tflite = export_to_tflite, model_id = model_id)
-
-export_to_onnx = True
-export_to_tflite = False
-
-# %% [markdown]
-# To select the truck, choose a point on it. Points are input to the model in (x,y) format and come with labels 1 (foreground point) or 0 (background point). Multiple points can be input; here we use only one. The chosen point will be shown as a star on the image.
-
-# %%
 input_point = np.array([[500, 375]])
 input_label = np.array([1])
 
-# %%
-if False:
-    plt.figure(figsize=(10, 10))
-    plt.imshow(image)
-    show_points(input_point, input_label, plt.gca())
-    plt.axis('on')
-    plt.show()  
-
-# %%
-print(predictor._features["image_embed"].shape, predictor._features["image_embed"][-1].shape)
-
-# %% [markdown]
-# Predict with `SAM2ImagePredictor.predict`. The model returns masks, quality predictions for those masks, and low resolution mask logits that can be passed to the next iteration of prediction.
-
-# %%
 masks, scores, logits = predictor.predict(
     point_coords=input_point,
     point_labels=input_label,
     multimask_output=True,
-    export_to_onnx=export_to_onnx,
+    export_to_onnx=export_to_onnx_mask_decoder,
     export_to_tflite=export_to_tflite,
+    import_from_onnx=import_from_onnx,
+    import_from_tflite=import_from_tflite,
     model_id=model_id
 )
 sorted_ind = np.argsort(scores)[::-1]
@@ -159,13 +97,6 @@ masks = masks[sorted_ind]
 scores = scores[sorted_ind]
 logits = logits[sorted_ind]
 
-# %% [markdown]
-# With `multimask_output=True` (the default setting), SAM 2 outputs 3 masks, where `scores` gives the model's own estimation of the quality of these masks. This setting is intended for ambiguous input prompts, and helps the model disambiguate different objects consistent with the prompt. When `False`, it will return a single mask. For ambiguous prompts such as a single point, it is recommended to use `multimask_output=True` even if only a single mask is desired; the best single mask can be chosen by picking the one with the highest score returned in `scores`. This will often result in a better mask.
-
-# %%
-masks.shape  # (number_of_masks) x H x W
-
-# %%
 if show:
     show_masks(image, masks, scores, point_coords=input_point, input_labels=input_label, borders=True)
 

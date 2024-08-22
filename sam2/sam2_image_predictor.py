@@ -12,6 +12,8 @@ import numpy as np
 import torch
 from PIL.Image import Image
 
+import onnxruntime
+
 from sam2.modeling.sam2_base import SAM2Base
 
 from sam2.utils.transforms import SAM2Transforms
@@ -88,6 +90,8 @@ class SAM2ImagePredictor:
         image: Union[np.ndarray, Image],
         export_to_onnx = False,
         export_to_tflite = False,
+        import_from_onnx = False,
+        import_from_tflite = False,
         model_id=None
     ) -> None:
         """
@@ -117,26 +121,36 @@ class SAM2ImagePredictor:
             len(input_image.shape) == 4 and input_image.shape[1] == 3
         ), f"input_image must be of size 1x3xHxW, got {input_image.shape}"
         logging.info("Computing image embeddings for the provided image...")
+
         if export_to_onnx:
             print("input_image", input_image.shape)
             torch.onnx.export(
-                self.model, (input_image), 'image_encoder'+model_id+'.onnx',
+                self.model, (input_image), 'image_encoder_'+model_id+'.onnx',
                 input_names=["input_image"],
                 output_names=["feats1", "feats2", "feats3"],
                 verbose=False, opset_version=17
             )
+        
+        if import_from_onnx:
+            model = onnxruntime.InferenceSession("image_encoder_"+model_id+".onnx")
+            vision_feat1, vision_feat2, vision_feat3 = model.run(None, {"input_image":input_image.numpy()})
+            feats = [torch.Tensor(vision_feat1), torch.Tensor(vision_feat2), torch.Tensor(vision_feat3)]
+
         if export_to_tflite:
             import ai_edge_torch
             import tensorflow as tf
             sample_inputs = (input_image,)
 
-            export_float = False
-            export_int8 = True
+            export_float = True
+            export_int8 = False
 
             if export_float:
                 tfl_converter_flags = {'target_spec': {'supported_ops': [tf.lite.OpsSet.TFLITE_BUILTINS, tf.lite.OpsSet.SELECT_TF_OPS]}}
                 edge_model = ai_edge_torch.convert(self.model, sample_inputs, _ai_edge_converter_flags=tfl_converter_flags)
                 edge_model.export("image_encoder_"+model_id+".tflite")
+                if import_from_tflite:
+                    vision_feat1, vision_feat2, vision_feat3 = edge_model(sample_inputs)
+                    feats = [torch.Tensor(vision_feat1), torch.Tensor(vision_feat2), torch.Tensor(vision_feat3)]
 
             if export_int8:
                 from ai_edge_torch.quantize import pt2e_quantizer
@@ -160,7 +174,11 @@ class SAM2ImagePredictor:
                 )
                 with_quantizer.export("image_encoder_int8_"+model_id+".tflite")
 
-        if True:
+                if import_from_tflite:
+                    vision_feat1, vision_feat2, vision_feat3 = model(sample_inputs)
+                    feats = [torch.Tensor(vision_feat1), torch.Tensor(vision_feat2), torch.Tensor(vision_feat3)]
+
+        if not import_from_onnx and not import_from_tflite:
             backbone_out = self.model.forward_image(input_image)
             _, vision_feats, _, _ = self.model._prepare_backbone_features(backbone_out)
             # Add no_mem_embed, which is added to the lowest rest feat. map during training on videos
@@ -171,6 +189,7 @@ class SAM2ImagePredictor:
                 feat.permute(1, 2, 0).view(1, -1, *feat_size)
                 for feat, feat_size in zip(vision_feats[::-1], self._bb_feat_sizes[::-1])
             ][::-1]
+
         self._features = {"image_embed": feats[-1], "high_res_feats": feats[:-1]}
         self._is_image_set = True
         logging.info("Image embeddings computed.")
@@ -292,6 +311,8 @@ class SAM2ImagePredictor:
         normalize_coords=True,
         export_to_onnx=False,
         export_to_tflite=False,
+        import_from_onnx = False,
+        import_from_tflite = False,
         model_id=None
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
@@ -346,6 +367,8 @@ class SAM2ImagePredictor:
             return_logits=return_logits,
             export_to_onnx=export_to_onnx,
             export_to_tflite=export_to_tflite,
+            import_from_onnx=import_from_onnx,
+            import_from_tflite=import_from_tflite,
             model_id=model_id
         )
 
@@ -397,6 +420,8 @@ class SAM2ImagePredictor:
         img_idx: int = -1,
         export_to_onnx = False,
         export_to_tflite = False,
+        import_from_onnx = False,
+        import_from_tflite = False,
         model_id = None
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """

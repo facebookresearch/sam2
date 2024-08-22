@@ -135,6 +135,7 @@ class SAM2ImagePredictor:
             model = onnxruntime.InferenceSession("image_encoder_"+model_id+".onnx")
             vision_feat1, vision_feat2, vision_feat3 = model.run(None, {"input_image":input_image.numpy()})
             feats = [torch.Tensor(vision_feat1), torch.Tensor(vision_feat2), torch.Tensor(vision_feat3)]
+            #print("feats", vision_feat1.shape, vision_feat2.shape, vision_feat3.shape)
 
         if export_to_tflite:
             import ai_edge_torch
@@ -499,10 +500,13 @@ class SAM2ImagePredictor:
                 verbose=False, opset_version=17
             )
 
-            import onnxruntime
+        if import_from_onnx:
             model = onnxruntime.InferenceSession("prompt_encoder_sparse_"+model_id+".onnx")
             sparse_embeddings, dense_embeddings = model.run(None, {"coords":concat_points[0].numpy(), "labels":concat_points[1].numpy()})
+            sparse_embeddings = torch.Tensor(sparse_embeddings)
+            dense_embeddings = torch.Tensor(dense_embeddings)
 
+        #if export_to_onnx:
             #self.model.sam_prompt_encoder.forward = self.model.sam_prompt_encoder.forward_dense
             #if mask_input is None:
             #    mask_input_non_zero = np.zeros((1, 1024, 1024))
@@ -521,7 +525,8 @@ class SAM2ImagePredictor:
             self.model.sam_prompt_encoder.forward = self.model.sam_prompt_encoder.forward_sparse
             edge_model = ai_edge_torch.convert(self.model.sam_prompt_encoder, sample_inputs)
             edge_model.export("prompt_encoder_sparse_"+model_id+".tflite")
-        if True:
+
+        if not import_from_onnx and not import_from_tflite:
             sparse_embeddings, dense_embeddings = self.model.sam_prompt_encoder.forward_normal(
                 coords=concat_points[0],
                 labels=concat_points[1],
@@ -537,20 +542,20 @@ class SAM2ImagePredictor:
             feat_level[img_idx].unsqueeze(0)
             for feat_level in self._features["high_res_feats"]
         ]
+
+        #print("sparse_embeddings", sparse_embeddings.shape)
+        #print("dense_embeddings", dense_embeddings.shape)
+
         if export_to_onnx:
-            print("sparse_embeddings", sparse_embeddings.shape)
-            print("dense_embeddings", dense_embeddings.shape)
             torch.onnx.export(
                 self.model.sam_mask_decoder, (self._features["image_embed"][img_idx].unsqueeze(0), self.model.sam_prompt_encoder.get_dense_pe(), sparse_embeddings, dense_embeddings, multimask_output, batched_mode, high_res_features[0], high_res_features[1]),
                 'mask_decoder_'+model_id+'.onnx',
                 input_names=["image_embeddings", "image_pe", "sparse_prompt_embeddings", "dense_prompt_embeddings", "multimask_output", "repeat_image", "high_res_features1", "high_res_features2"],
                 output_names=["low_res_masks", "iou_predictions"],
-                #dynamic_axes={
-                #    'unnorm_coords': {2: 'width', 3: 'height'}
-                #},
                 verbose=False, opset_version=17
             )
-            import onnxruntime
+        
+        if import_from_onnx:
             model = onnxruntime.InferenceSession("mask_decoder_"+model_id+".onnx")
             low_res_masks, iou_predictions, _, _  = model.run(None, {
                 "image_embeddings":self._features["image_embed"][img_idx].unsqueeze(0).numpy(),
@@ -559,12 +564,16 @@ class SAM2ImagePredictor:
                 "dense_prompt_embeddings": dense_embeddings.numpy(),
                 "high_res_features1":high_res_features[0].numpy(),
                 "high_res_features2":high_res_features[1].numpy()})
+            low_res_masks = torch.Tensor(low_res_masks)
+            iou_predictions = torch.Tensor(iou_predictions)
+
         if export_to_tflite:
             import ai_edge_torch
             sample_inputs = (self._features["image_embed"][img_idx].unsqueeze(0), self.model.sam_prompt_encoder.get_dense_pe(), sparse_embeddings, dense_embeddings, multimask_output, batched_mode, high_res_features[0], high_res_features[1])
             edge_model = ai_edge_torch.convert(self.model.sam_mask_decoder, sample_inputs)
             edge_model.export("mask_decoder_"+model_id+".tflite")
-        if True:
+
+        if not import_from_onnx and not import_from_tflite:
             low_res_masks, iou_predictions, _, _ = self.model.sam_mask_decoder(
                 image_embeddings=self._features["image_embed"][img_idx].unsqueeze(0),
                 image_pe=self.model.sam_prompt_encoder.get_dense_pe(),

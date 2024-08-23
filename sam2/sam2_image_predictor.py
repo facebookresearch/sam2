@@ -150,7 +150,7 @@ class SAM2ImagePredictor:
                 edge_model = ai_edge_torch.convert(self.model, sample_inputs, _ai_edge_converter_flags=tfl_converter_flags)
                 edge_model.export("image_encoder_"+model_id+".tflite")
                 if import_from_tflite:
-                    vision_feat1, vision_feat2, vision_feat3 = edge_model(sample_inputs)
+                    vision_feat1, vision_feat2, vision_feat3 = edge_model(input_image)
                     feats = [torch.Tensor(vision_feat1), torch.Tensor(vision_feat2), torch.Tensor(vision_feat3)]
 
             if export_int8:
@@ -179,7 +179,7 @@ class SAM2ImagePredictor:
                     vision_feat1, vision_feat2, vision_feat3 = model(sample_inputs)
                     feats = [torch.Tensor(vision_feat1), torch.Tensor(vision_feat2), torch.Tensor(vision_feat3)]
 
-        if not import_from_onnx and not import_from_tflite:
+        if not import_from_onnx and (not import_from_tflite or not export_to_tflite):
             backbone_out = self.model.forward_image(input_image)
             _, vision_feats, _, _ = self.model._prepare_backbone_features(backbone_out)
             # Add no_mem_embed, which is added to the lowest rest feat. map during training on videos
@@ -527,7 +527,7 @@ class SAM2ImagePredictor:
             edge_model = ai_edge_torch.convert(self.model.sam_prompt_encoder, sample_inputs)
             edge_model.export("prompt_encoder_sparse_"+model_id+".tflite")
 
-        if not import_from_onnx and not import_from_tflite:
+        if not import_from_onnx and (not import_from_tflite or not export_to_tflite):
             sparse_embeddings, dense_embeddings = self.model.sam_prompt_encoder.forward_normal(
                 coords=concat_points[0],
                 labels=concat_points[1],
@@ -575,7 +575,7 @@ class SAM2ImagePredictor:
             edge_model = ai_edge_torch.convert(self.model.sam_mask_decoder, sample_inputs)
             edge_model.export("mask_decoder_"+model_id+".tflite")
 
-        if not import_from_onnx and not import_from_tflite:
+        if not import_from_onnx and (not import_from_tflite or not export_to_tflite):
             low_res_masks, iou_predictions, _, _ = self.model.sam_mask_decoder(
                 image_embeddings=self._features["image_embed"][img_idx].unsqueeze(0),
                 image_pe=dense_pe,

@@ -10,10 +10,13 @@ from sam2.sam2_image_predictor import SAM2ImagePredictor
 # export settings
 export_to_onnx_image_encoder = False
 export_to_onnx_mask_decoder = False
-export_to_tflite = False
-import_from_onnx = True
-import_from_tflite = False
+export_to_tflite_image_encoder = True
+export_to_tflite_mask_decoder = False
+import_from_onnx = False
+import_from_tflite = True
 show = True
+
+# export PJRT_DEVICE=CPU
 
 # model settings
 sam2_checkpoint = "./checkpoints/sam2_hiera_large.pt"
@@ -68,6 +71,7 @@ def show_masks(image, masks, scores, point_coords=None, box_coords=None, input_l
             plt.title(f"Mask {i+1}, Score: {score:.3f}", fontsize=18)
         plt.axis('off')
         plt.show()
+        plt.savefig(f'output{i+1}.png')
 
 # logic
 image = Image.open('notebooks/images/truck.jpg')
@@ -77,7 +81,7 @@ sam2_model = build_sam2(model_cfg, sam2_checkpoint, device=device)
 
 predictor = SAM2ImagePredictor(sam2_model)
 
-predictor.set_image(image, export_to_onnx = export_to_onnx_image_encoder, export_to_tflite = export_to_tflite, import_from_onnx = import_from_onnx, import_from_tflite = import_from_tflite, model_id = model_id)
+predictor.set_image(image, export_to_onnx = export_to_onnx_image_encoder, export_to_tflite = export_to_tflite_image_encoder, import_from_onnx = import_from_onnx, import_from_tflite = import_from_tflite, model_id = model_id)
 
 input_point = np.array([[500, 375]])
 input_label = np.array([1])
@@ -87,7 +91,7 @@ masks, scores, logits = predictor.predict(
     point_labels=input_label,
     multimask_output=True,
     export_to_onnx=export_to_onnx_mask_decoder,
-    export_to_tflite=export_to_tflite,
+    export_to_tflite=export_to_tflite_mask_decoder,
     import_from_onnx=import_from_onnx,
     import_from_tflite=import_from_tflite,
     model_id=model_id

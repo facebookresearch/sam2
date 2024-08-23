@@ -97,13 +97,25 @@ class PromptEncoder(nn.Module):
         #point_embedding[labels == -1] = 0.0
         #point_embedding[labels == -1] += self.not_a_point_embed.weight
 
-        # こっちだと動く
-        point_embedding[labels == -1] = self.not_a_point_embed.weight
+        # こっちだとonnxで動くが、tfliteでうごかない
+        #point_embedding[labels == -1] = self.not_a_point_embed.weight
         
-        point_embedding[labels == 0] += self.point_embeddings[0].weight
-        point_embedding[labels == 1] += self.point_embeddings[1].weight
-        point_embedding[labels == 2] += self.point_embeddings[2].weight
-        point_embedding[labels == 3] += self.point_embeddings[3].weight
+        #point_embedding[labels == 0] += self.point_embeddings[0].weight
+        #point_embedding[labels == 1] += self.point_embeddings[1].weight
+        #point_embedding[labels == 2] += self.point_embeddings[2].weight
+        #point_embedding[labels == 3] += self.point_embeddings[3].weight
+
+        # こっちだと、tfliteでも動く
+        labels = labels.int()
+        table = torch.zeros((5, self.point_embeddings[0].weight.shape[1]))
+        table[0] = self.not_a_point_embed.weight
+        table[1] = self.point_embeddings[0].weight
+        table[2] = self.point_embeddings[1].weight
+        table[3] = self.point_embeddings[2].weight
+        table[4] = self.point_embeddings[3].weight
+        for i in range(labels.shape[0]):
+            point_embedding[i] = point_embedding[i] + table[labels[i] + 1]
+
         return point_embedding
 
     def _embed_boxes(self, boxes: torch.Tensor) -> torch.Tensor:

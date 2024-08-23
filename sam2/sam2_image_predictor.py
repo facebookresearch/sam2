@@ -527,6 +527,12 @@ class SAM2ImagePredictor:
             edge_model = ai_edge_torch.convert(self.model.sam_prompt_encoder, sample_inputs)
             edge_model.export("prompt_encoder_sparse_"+model_id+".tflite")
 
+            if import_from_tflite:
+                sparse_embeddings, dense_embeddings, dense_pe = edge_model(concat_points[0], concat_points[1])
+                sparse_embeddings = torch.Tensor(sparse_embeddings)
+                dense_embeddings = torch.Tensor(dense_embeddings)
+                dense_pe = torch.Tensor(dense_pe)
+
         if not import_from_onnx and (not import_from_tflite or not export_to_tflite):
             sparse_embeddings, dense_embeddings = self.model.sam_prompt_encoder.forward_normal(
                 coords=concat_points[0],
@@ -574,6 +580,11 @@ class SAM2ImagePredictor:
             sample_inputs = (self._features["image_embed"][img_idx].unsqueeze(0), dense_pe, sparse_embeddings, dense_embeddings, multimask_output, batched_mode, high_res_features[0], high_res_features[1])
             edge_model = ai_edge_torch.convert(self.model.sam_mask_decoder, sample_inputs)
             edge_model.export("mask_decoder_"+model_id+".tflite")
+            multimask_output_np = np.zeros((1), dtype=bool)
+            batched_mode_np = np.zeros((1), dtype=bool)
+            low_res_masks, iou_predictions, _, _ = edge_model(self._features["image_embed"][img_idx].unsqueeze(0), dense_pe, sparse_embeddings, dense_embeddings, multimask_output_np, batched_mode_np, high_res_features[0], high_res_features[1])
+            low_res_masks = torch.Tensor(low_res_masks)
+            iou_predictions = torch.Tensor(iou_predictions)
 
         if not import_from_onnx and (not import_from_tflite or not export_to_tflite):
             low_res_masks, iou_predictions, _, _ = self.model.sam_mask_decoder(

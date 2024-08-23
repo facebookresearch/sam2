@@ -10,8 +10,8 @@ from sam2.sam2_image_predictor import SAM2ImagePredictor
 # export settings
 export_to_onnx_image_encoder = False
 export_to_onnx_mask_decoder = False
-export_to_tflite_image_encoder = True
-export_to_tflite_mask_decoder = False
+export_to_tflite_image_encoder = False
+export_to_tflite_mask_decoder = True
 import_from_onnx = False
 import_from_tflite = True
 show = True

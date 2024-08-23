@@ -195,7 +195,7 @@ class MaskDecoder(nn.Module):
                 [self.iou_token.weight, self.mask_tokens.weight], dim=0
             )
         output_tokens = output_tokens.unsqueeze(0).expand(
-            sparse_prompt_embeddings.size(0), -1, -1
+            sparse_prompt_embeddings.shape[0], -1, -1
         )
         tokens = torch.cat((output_tokens, sparse_prompt_embeddings), dim=1)
 
@@ -207,7 +207,7 @@ class MaskDecoder(nn.Module):
             src = image_embeddings
         src = src + dense_prompt_embeddings
         assert (
-            image_pe.size(0) == 1
+            image_pe.shape[0] == 1
         ), "image_pe should have size 1 in batch dim (from `get_dense_pe()`)"
         pos_src = torch.repeat_interleave(image_pe, tokens.shape[0], dim=0)
         b, c, h, w = src.shape

@@ -250,9 +250,4 @@ class RoPEAttention(Attention):
 - **TensorFlow/Keras Equivalents:**  Uses `layers.Dense`, `layers.LayerNormalization`, `tf.transpose`, `tf.reshape`, and other TensorFlow/Keras equivalents for PyTorch operations.
 - **Training Argument:**  The `call` method in all classes now takes the `training` argument to control training-specific behavior (e.g., dropout). 
 
-**Next Steps:**
-
-- **Continue Conversion:**  Move on to converting the remaining modules, such as `backbones/hieradet.py`, `backbones/image_encoder.py`, etc.
-- **Thorough Testing:**  As you convert each module, make sure to test it carefully to ensure that its behavior matches the PyTorch implementation. 
-
 '''

@@ -92,6 +92,7 @@ class SAM2ImagePredictor:
         export_to_tflite = False,
         import_from_onnx = False,
         import_from_tflite = False,
+        tflite_int8=False,
         model_id=None
     ) -> None:
         """
@@ -142,18 +143,12 @@ class SAM2ImagePredictor:
             import tensorflow as tf
             sample_inputs = (input_image,)
 
-            export_float = True
-            export_int8 = False
-
-            if export_float:
+            if not tflite_int8:
                 tfl_converter_flags = {'target_spec': {'supported_ops': [tf.lite.OpsSet.TFLITE_BUILTINS, tf.lite.OpsSet.SELECT_TF_OPS]}}
                 edge_model = ai_edge_torch.convert(self.model, sample_inputs, _ai_edge_converter_flags=tfl_converter_flags)
                 edge_model.export("image_encoder_"+model_id+".tflite")
-                if import_from_tflite:
-                    vision_feat1, vision_feat2, vision_feat3 = edge_model(input_image)
-                    feats = [torch.Tensor(vision_feat1), torch.Tensor(vision_feat2), torch.Tensor(vision_feat3)]
 
-            if export_int8:
+            if tflite_int8:
                 from ai_edge_torch.quantize import pt2e_quantizer
                 from ai_edge_torch.quantize import quant_config
                 from torch.ao.quantization import quantize_pt2e
@@ -163,7 +158,7 @@ class SAM2ImagePredictor:
                 )
                 model = torch._export.capture_pre_autograd_graph(self.model, sample_inputs)
                 model = quantize_pt2e.prepare_pt2e(model, quantizer)
-                #model(input_image.type(torch.FloatTensor)) # calibration           
+                model(input_image) # calibration (you need to edit reset_histogram function)
                 model = quantize_pt2e.convert_pt2e(model, fold_quantize=False)
 
                 tfl_converter_flags = {'target_spec': {'supported_ops': [tf.lite.OpsSet.TFLITE_BUILTINS, tf.lite.OpsSet.SELECT_TF_OPS]}}
@@ -173,11 +168,11 @@ class SAM2ImagePredictor:
                     quant_config=quant_config.QuantConfig(pt2e_quantizer=quantizer),
                     _ai_edge_converter_flags=tfl_converter_flags
                 )
-                with_quantizer.export("image_encoder_int8_"+model_id+".tflite")
+                with_quantizer.export("image_encoder_"+model_id+"_int8.tflite")
 
-                if import_from_tflite:
-                    vision_feat1, vision_feat2, vision_feat3 = model(sample_inputs)
-                    feats = [torch.Tensor(vision_feat1), torch.Tensor(vision_feat2), torch.Tensor(vision_feat3)]
+            if import_from_tflite:
+                vision_feat1, vision_feat2, vision_feat3 = model(input_image)
+                feats = [torch.Tensor(vision_feat1), torch.Tensor(vision_feat2), torch.Tensor(vision_feat3)]
 
         if not import_from_onnx and (not import_from_tflite or not export_to_tflite):
             backbone_out = self.model.forward_image(input_image)
@@ -314,6 +309,7 @@ class SAM2ImagePredictor:
         export_to_tflite=False,
         import_from_onnx = False,
         import_from_tflite = False,
+        tflite_int8=False,
         model_id=None
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
@@ -370,6 +366,7 @@ class SAM2ImagePredictor:
             export_to_tflite=export_to_tflite,
             import_from_onnx=import_from_onnx,
             import_from_tflite=import_from_tflite,
+            tflite_int8=tflite_int8,
             model_id=model_id
         )
 
@@ -421,6 +418,7 @@ class SAM2ImagePredictor:
         img_idx: int = -1,
         export_to_onnx = False,
         export_to_tflite = False,
+        tflite_int8 = False,
         import_from_onnx = False,
         import_from_tflite = False,
         model_id = None
@@ -524,8 +522,33 @@ class SAM2ImagePredictor:
             import ai_edge_torch
             sample_inputs = (concat_points[0], concat_points[1])
             self.model.sam_prompt_encoder.forward = self.model.sam_prompt_encoder.forward_sparse
-            edge_model = ai_edge_torch.convert(self.model.sam_prompt_encoder, sample_inputs)
-            edge_model.export("prompt_encoder_sparse_"+model_id+".tflite")
+
+            if not tflite_int8:
+                edge_model = ai_edge_torch.convert(self.model.sam_prompt_encoder, sample_inputs)
+                edge_model.export("prompt_encoder_sparse_"+model_id+".tflite")
+
+            if tflite_int8:
+                from ai_edge_torch.quantize import pt2e_quantizer
+                from ai_edge_torch.quantize import quant_config
+                from torch.ao.quantization import quantize_pt2e
+                #import tensorflow as tf
+
+                quantizer = pt2e_quantizer.PT2EQuantizer().set_global(
+                    pt2e_quantizer.get_symmetric_quantization_config()
+                )
+                model = torch._export.capture_pre_autograd_graph(self.model.sam_prompt_encoder, sample_inputs)
+                model = quantize_pt2e.prepare_pt2e(model, quantizer)
+                model(concat_points[0], concat_points[1]) # calibration
+                model = quantize_pt2e.convert_pt2e(model, fold_quantize=False)
+
+                #tfl_converter_flags = {'target_spec': {'supported_ops': [tf.lite.OpsSet.TFLITE_BUILTINS]}}#, tf.lite.OpsSet.SELECT_TF_OPS]}}
+                with_quantizer = ai_edge_torch.convert(
+                    model,
+                    sample_inputs,
+                    quant_config=quant_config.QuantConfig(pt2e_quantizer=quantizer),
+                    #_ai_edge_converter_flags=tfl_converter_flags
+                )
+                with_quantizer.export("prompt_encoder_sparse_"+model_id+"_int8.tflite")
 
             if import_from_tflite:
                 sparse_embeddings, dense_embeddings, dense_pe = edge_model(concat_points[0], concat_points[1])
@@ -576,15 +599,41 @@ class SAM2ImagePredictor:
             iou_predictions = torch.Tensor(iou_predictions)
 
         if export_to_tflite:
-            import ai_edge_torch
-            sample_inputs = (self._features["image_embed"][img_idx].unsqueeze(0), dense_pe, sparse_embeddings, dense_embeddings, multimask_output, batched_mode, high_res_features[0], high_res_features[1])
-            edge_model = ai_edge_torch.convert(self.model.sam_mask_decoder, sample_inputs)
-            edge_model.export("mask_decoder_"+model_id+".tflite")
-            multimask_output_np = np.zeros((1), dtype=bool)
-            batched_mode_np = np.zeros((1), dtype=bool)
-            low_res_masks, iou_predictions, _, _ = edge_model(self._features["image_embed"][img_idx].unsqueeze(0), dense_pe, sparse_embeddings, dense_embeddings, multimask_output_np, batched_mode_np, high_res_features[0], high_res_features[1])
-            low_res_masks = torch.Tensor(low_res_masks)
-            iou_predictions = torch.Tensor(iou_predictions)
+            if not tflite_int8:
+                import ai_edge_torch
+                sample_inputs = (self._features["image_embed"][img_idx].unsqueeze(0), dense_pe, sparse_embeddings, dense_embeddings, multimask_output, batched_mode, high_res_features[0], high_res_features[1])
+                edge_model = ai_edge_torch.convert(self.model.sam_mask_decoder, sample_inputs)
+                edge_model.export("mask_decoder_"+model_id+".tflite")
+                multimask_output_np = np.zeros((1), dtype=bool)
+                batched_mode_np = np.zeros((1), dtype=bool)
+
+            if tflite_int8:
+                from ai_edge_torch.quantize import pt2e_quantizer
+                from ai_edge_torch.quantize import quant_config
+                from torch.ao.quantization import quantize_pt2e
+                #import tensorflow as tf
+
+                quantizer = pt2e_quantizer.PT2EQuantizer().set_global(
+                    pt2e_quantizer.get_symmetric_quantization_config()
+                )
+                model = torch._export.capture_pre_autograd_graph(self.model.sam_mask_decoder, sample_inputs)
+                model = quantize_pt2e.prepare_pt2e(model, quantizer)
+                model(self._features["image_embed"][img_idx].unsqueeze(0), dense_pe, sparse_embeddings, dense_embeddings, multimask_output, batched_mode, high_res_features[0], high_res_features[1]) # calibration
+                model = quantize_pt2e.convert_pt2e(model, fold_quantize=False)
+
+                #tfl_converter_flags = {'target_spec': {'supported_ops': [tf.lite.OpsSet.TFLITE_BUILTINS, tf.lite.OpsSet.SELECT_TF_OPS]}}
+                with_quantizer = ai_edge_torch.convert(
+                    model,
+                    sample_inputs,
+                    quant_config=quant_config.QuantConfig(pt2e_quantizer=quantizer),
+                   # _ai_edge_converter_flags=tfl_converter_flags
+                )
+                with_quantizer.export("mask_decoder_"+model_id+"_int8.tflite")
+
+            if import_from_tflite:
+                low_res_masks, iou_predictions, _, _ = edge_model(self._features["image_embed"][img_idx].unsqueeze(0), dense_pe, sparse_embeddings, dense_embeddings, multimask_output_np, batched_mode_np, high_res_features[0], high_res_features[1])
+                low_res_masks = torch.Tensor(low_res_masks)
+                iou_predictions = torch.Tensor(iou_predictions)
 
         if not import_from_onnx and (not import_from_tflite or not export_to_tflite):
             low_res_masks, iou_predictions, _, _ = self.model.sam_mask_decoder(

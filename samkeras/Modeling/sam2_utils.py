@@ -142,6 +142,5 @@ MLP Implementation: The MLP class is implemented using layers.Dense and layers.A
 LayerNorm2d: The custom 2D Layer Normalization is implemented using TensorFlow's math operations.
 Next Steps:
 
-Integration: You can now use the fully implemented sam2_utils.py file in the other modules we have converted (memory_attention.py, memory_encoder.py, etc.).
-Remaining Conversions: Continue converting the remaining files, including automatic_mask_generator.py, the data pipeline (data_pipeline.py), and the main script (main.py).
+n
 '''

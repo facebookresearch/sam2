@@ -351,9 +351,9 @@ class SAM2Base(torch.nn.Module):
             # a learned `no_mask_embed` to indicate no mask input in this case).
             sam_mask_prompt = None
 
-        sparse_embeddings, dense_embeddings = self.sam_prompt_encoder(
-            points=(sam_point_coords, sam_point_labels),
-            boxes=None,
+        sparse_embeddings, dense_embeddings = self.sam_prompt_encoder.forward_normal(
+            coords=sam_point_coords,
+            labels=sam_point_labels,
             masks=sam_mask_prompt,
         )
         (
@@ -368,7 +368,8 @@ class SAM2Base(torch.nn.Module):
             dense_prompt_embeddings=dense_embeddings,
             multimask_output=multimask_output,
             repeat_image=False,  # the image is already batched
-            high_res_features=high_res_features,
+            high_res_features1=high_res_features[0],
+            high_res_features2=high_res_features[1],
         )
         if self.pred_obj_scores:
             is_obj_appearing = object_score_logits > 0

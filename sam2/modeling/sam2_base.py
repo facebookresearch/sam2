@@ -356,30 +356,28 @@ class SAM2Base(torch.nn.Module):
             print("begin onnx mode")
             if sam_mask_prompt != None:
                 raise("currently not supported mask prompt")
-            if multimask_output != True:
-                raise("currently not supported multimask_output True")
             import onnxruntime
             model_id = "hiera_l"
             model = onnxruntime.InferenceSession("prompt_encoder_sparse_"+model_id+".onnx")
-            sparse_embeddings, dense_embeddings, dense_pe = model.run(None, {"coords":sam_point_coords, "labels":sam_point_labels})
+            sparse_embeddings, dense_embeddings, dense_pe = model.run(None, {"coords":sam_point_coords.numpy(), "labels":sam_point_labels.numpy()})
             sparse_embeddings = torch.Tensor(sparse_embeddings)
             dense_embeddings = torch.Tensor(dense_embeddings)
             dense_pe = torch.Tensor(dense_pe)
 
             model = onnxruntime.InferenceSession("mask_decoder_"+model_id+".onnx")
-            low_res_multimasks, ious, sam_output_tokens, object_score_logits  = model.run(None, {
+            masks, iou_pred, sam_tokens_out, object_score_logits, object_score_logits  = model.run(None, {
                 "image_embeddings":backbone_features.numpy(),
                 "image_pe": dense_pe.numpy(),
                 "sparse_prompt_embeddings": sparse_embeddings.numpy(),
                 "dense_prompt_embeddings": dense_embeddings.numpy(),
-                #multimask_output=multimask_output,
                 #repeat_image=False,  # the image is already batched
                 "high_res_features1":high_res_features[0].numpy(),
                 "high_res_features2":high_res_features[1].numpy()})
-            low_res_masks = torch.Tensor(low_res_masks)
-            iou_predictions = torch.Tensor(iou_predictions)
-            sam_output_tokens = torch.Tensor(sam_output_tokens)
+            masks = torch.Tensor(masks)
+            iou_pred = torch.Tensor(iou_pred)
+            sam_tokens_out = torch.Tensor(sam_tokens_out)
             object_score_logits = torch.Tensor(object_score_logits)
+            low_res_multimasks, ious, sam_output_tokens, object_score_logits  = self.model.sam_mask_decoder.forward_postprocess(masks, iou_pred, sam_tokens_out, object_score_logits, multimask_output)
         else:
             sparse_embeddings, dense_embeddings = self.sam_prompt_encoder.forward_normal(
                 coords=sam_point_coords,
@@ -393,7 +391,7 @@ class SAM2Base(torch.nn.Module):
                 ious,
                 sam_output_tokens,
                 object_score_logits,
-            ) = self.sam_mask_decoder(
+            ) = self.sam_mask_decoder.forward_normal(
                 image_embeddings=backbone_features,
                 image_pe=dense_pe,
                 sparse_prompt_embeddings=sparse_embeddings,

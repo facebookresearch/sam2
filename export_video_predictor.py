@@ -12,7 +12,7 @@ from sam2.build_sam import build_sam2_video_predictor
 sam2_checkpoint = "./checkpoints/sam2_hiera_large.pt"
 model_cfg = "sam2_hiera_l.yaml"
 
-import_onnx = False
+import_onnx = True
 
 predictor = build_sam2_video_predictor(model_cfg, sam2_checkpoint, device=device)
 

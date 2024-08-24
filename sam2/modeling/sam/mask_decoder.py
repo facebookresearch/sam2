@@ -107,7 +107,8 @@ class MaskDecoder(nn.Module):
         self.dynamic_multimask_stability_delta = dynamic_multimask_stability_delta
         self.dynamic_multimask_stability_thresh = dynamic_multimask_stability_thresh
 
-    def forward(
+    # デフォルト実装
+    def forward_normal(
         self,
         image_embeddings: torch.Tensor,
         image_pe: torch.Tensor,
@@ -144,6 +145,59 @@ class MaskDecoder(nn.Module):
             high_res_features2=high_res_features2,
         )
 
+        # Select the correct mask or masks for output
+        if multimask_output:
+            masks = masks[:, 1:, :, :]
+            iou_pred = iou_pred[:, 1:]
+        elif self.dynamic_multimask_via_stability and not self.training:
+            masks, iou_pred = self._dynamic_multimask_via_stability(masks, iou_pred)
+        else:
+            masks = masks[:, 0:1, :, :]
+            iou_pred = iou_pred[:, 0:1]
+
+        if multimask_output and self.use_multimask_token_for_obj_ptr:
+            sam_tokens_out = mask_tokens_out[:, 1:]  # [b, 3, c] shape
+        else:
+            # Take the mask output token. Here we *always* use the token for single mask output.
+            # At test time, even if we track after 1-click (and using multimask_output=True),
+            # we still take the single mask token here. The rationale is that we always track
+            # after multiple clicks during training, so the past tokens seen during training
+            # are always the single mask token (and we'll let it be the object-memory token).
+            sam_tokens_out = mask_tokens_out[:, 0:1]  # [b, 1, c] shape
+
+        # Prepare output
+        return masks, iou_pred, sam_tokens_out, object_score_logits
+
+    # ONNXに変換するために推論とポスト処理を分離するバージョン
+    def forward_masks(
+        self,
+        image_embeddings: torch.Tensor,
+        image_pe: torch.Tensor,
+        sparse_prompt_embeddings: torch.Tensor,
+        dense_prompt_embeddings: torch.Tensor,
+        repeat_image: bool,
+        high_res_features1: Optional[torch.Tensor] = None,
+        high_res_features2: Optional[torch.Tensor] = None,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        masks, iou_pred, mask_tokens_out, object_score_logits = self.predict_masks(
+            image_embeddings=image_embeddings,
+            image_pe=image_pe,
+            sparse_prompt_embeddings=sparse_prompt_embeddings,
+            dense_prompt_embeddings=dense_prompt_embeddings,
+            repeat_image=repeat_image,
+            high_res_features1=high_res_features1,
+            high_res_features2=high_res_features2,
+        )
+        return masks, iou_pred, mask_tokens_out, object_score_logits
+
+    def forward_postprocess(
+        self,
+        masks: torch.Tensor,
+        iou_pred: torch.Tensor,
+        mask_tokens_out: torch.Tensor,
+        object_score_logits: torch.Tensor,
+        multimask_output: bool,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         # Select the correct mask or masks for output
         if multimask_output:
             masks = masks[:, 1:, :, :]

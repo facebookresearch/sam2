@@ -9,12 +9,12 @@ from sam2.sam2_image_predictor import SAM2ImagePredictor
 
 # export settings
 export_to_onnx_image_encoder = False
-export_to_onnx_mask_decoder = False
+export_to_onnx_mask_decoder = True
 export_to_tflite_image_encoder = False
-export_to_tflite_mask_decoder = True
-import_from_onnx = False
-import_from_tflite = True
-tflite_int8 = True
+export_to_tflite_mask_decoder = False
+import_from_onnx = True
+import_from_tflite = False
+tflite_int8 = False
 show = True
 
 # export PJRT_DEVICE=CPU
@@ -71,7 +71,7 @@ def show_masks(image, masks, scores, point_coords=None, box_coords=None, input_l
         if len(scores) > 1:
             plt.title(f"Mask {i+1}, Score: {score:.3f}", fontsize=18)
         plt.axis('off')
-        plt.show()
+        #plt.show()
         plt.savefig(f'output{i+1}.png')
 
 # logic

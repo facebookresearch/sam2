@@ -584,6 +584,9 @@ class SAM2ImagePredictor:
                 'mask_decoder_'+model_id+'.onnx',
                 input_names=["image_embeddings", "image_pe", "sparse_prompt_embeddings", "dense_prompt_embeddings", "repeat_image", "high_res_features1", "high_res_features2"],
                 output_names=["low_res_masks", "iou_predictions"],
+                dynamic_axes={
+                    'sparse_prompt_embeddings': {1: 'n'},
+                },
                 verbose=False, opset_version=17
             )
         

@@ -365,7 +365,7 @@ class SAM2Base(torch.nn.Module):
             dense_pe = torch.Tensor(dense_pe)
 
             model = onnxruntime.InferenceSession("mask_decoder_"+model_id+".onnx")
-            masks, iou_pred, sam_tokens_out, object_score_logits, object_score_logits  = model.run(None, {
+            masks, iou_pred, sam_tokens_out, object_score_logits  = model.run(None, {
                 "image_embeddings":backbone_features.numpy(),
                 "image_pe": dense_pe.numpy(),
                 "sparse_prompt_embeddings": sparse_embeddings.numpy(),
@@ -377,7 +377,7 @@ class SAM2Base(torch.nn.Module):
             iou_pred = torch.Tensor(iou_pred)
             sam_tokens_out = torch.Tensor(sam_tokens_out)
             object_score_logits = torch.Tensor(object_score_logits)
-            low_res_multimasks, ious, sam_output_tokens, object_score_logits  = self.model.sam_mask_decoder.forward_postprocess(masks, iou_pred, sam_tokens_out, object_score_logits, multimask_output)
+            low_res_multimasks, ious, sam_output_tokens, object_score_logits  = self.sam_mask_decoder.forward_postprocess(masks, iou_pred, sam_tokens_out, object_score_logits, multimask_output)
         else:
             sparse_embeddings, dense_embeddings = self.sam_prompt_encoder.forward_normal(
                 coords=sam_point_coords,

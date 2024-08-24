@@ -275,6 +275,7 @@ class SAM2Base(torch.nn.Module):
         mask_inputs=None,
         high_res_features=None,
         multimask_output=False,
+        import_onnx=False
     ):
         """
         Forward SAM prompt encoders and mask heads.
@@ -351,26 +352,58 @@ class SAM2Base(torch.nn.Module):
             # a learned `no_mask_embed` to indicate no mask input in this case).
             sam_mask_prompt = None
 
-        sparse_embeddings, dense_embeddings = self.sam_prompt_encoder.forward_normal(
-            coords=sam_point_coords,
-            labels=sam_point_labels,
-            masks=sam_mask_prompt,
-        )
-        (
-            low_res_multimasks,
-            ious,
-            sam_output_tokens,
-            object_score_logits,
-        ) = self.sam_mask_decoder(
-            image_embeddings=backbone_features,
-            image_pe=self.sam_prompt_encoder.get_dense_pe(),
-            sparse_prompt_embeddings=sparse_embeddings,
-            dense_prompt_embeddings=dense_embeddings,
-            multimask_output=multimask_output,
-            repeat_image=False,  # the image is already batched
-            high_res_features1=high_res_features[0],
-            high_res_features2=high_res_features[1],
-        )
+        if import_onnx:
+            print("begin onnx mode")
+            if sam_mask_prompt != None:
+                raise("currently not supported mask prompt")
+            if multimask_output != True:
+                raise("currently not supported multimask_output True")
+            import onnxruntime
+            model_id = "hiera_l"
+            model = onnxruntime.InferenceSession("prompt_encoder_sparse_"+model_id+".onnx")
+            sparse_embeddings, dense_embeddings, dense_pe = model.run(None, {"coords":sam_point_coords, "labels":sam_point_labels})
+            sparse_embeddings = torch.Tensor(sparse_embeddings)
+            dense_embeddings = torch.Tensor(dense_embeddings)
+            dense_pe = torch.Tensor(dense_pe)
+
+            model = onnxruntime.InferenceSession("mask_decoder_"+model_id+".onnx")
+            low_res_multimasks, ious, sam_output_tokens, object_score_logits  = model.run(None, {
+                "image_embeddings":backbone_features.numpy(),
+                "image_pe": dense_pe.numpy(),
+                "sparse_prompt_embeddings": sparse_embeddings.numpy(),
+                "dense_prompt_embeddings": dense_embeddings.numpy(),
+                #multimask_output=multimask_output,
+                #repeat_image=False,  # the image is already batched
+                "high_res_features1":high_res_features[0].numpy(),
+                "high_res_features2":high_res_features[1].numpy()})
+            low_res_masks = torch.Tensor(low_res_masks)
+            iou_predictions = torch.Tensor(iou_predictions)
+            sam_output_tokens = torch.Tensor(sam_output_tokens)
+            object_score_logits = torch.Tensor(object_score_logits)
+        else:
+            sparse_embeddings, dense_embeddings = self.sam_prompt_encoder.forward_normal(
+                coords=sam_point_coords,
+                labels=sam_point_labels,
+                masks=sam_mask_prompt,
+            )
+            dense_pe = self.sam_prompt_encoder.get_dense_pe()
+
+            (
+                low_res_multimasks,
+                ious,
+                sam_output_tokens,
+                object_score_logits,
+            ) = self.sam_mask_decoder(
+                image_embeddings=backbone_features,
+                image_pe=dense_pe,
+                sparse_prompt_embeddings=sparse_embeddings,
+                dense_prompt_embeddings=dense_embeddings,
+                multimask_output=multimask_output,
+                repeat_image=False,  # the image is already batched
+                high_res_features1=high_res_features[0],
+                high_res_features2=high_res_features[1],
+            )
+
         if self.pred_obj_scores:
             is_obj_appearing = object_score_logits > 0
 
@@ -429,7 +462,7 @@ class SAM2Base(torch.nn.Module):
             object_score_logits,
         )
 
-    def _use_mask_as_output(self, backbone_features, high_res_features, mask_inputs):
+    def _use_mask_as_output(self, backbone_features, high_res_features, mask_inputs, import_onnx):
         """
         Directly turn binary `mask_inputs` into a output mask logits without using SAM.
         (same input and output shapes as in _forward_sam_heads above).
@@ -458,6 +491,7 @@ class SAM2Base(torch.nn.Module):
                 backbone_features=backbone_features,
                 mask_inputs=self.mask_downsample(mask_inputs_float),
                 high_res_features=high_res_features,
+                import_onnx=import_onnx
             )
         # In this method, we are treating mask_input as output, e.g. using it directly to create spatial mem;
         # Below, we follow the same design axiom to use mask_input to decide if obj appears or not instead of relying
@@ -742,6 +776,7 @@ class SAM2Base(torch.nn.Module):
         run_mem_encoder=True,
         # The previously predicted SAM mask logits (which can be fed together with new clicks in demo).
         prev_sam_mask_logits=None,
+        import_onnx=False
     ):
         current_out = {"point_inputs": point_inputs, "mask_inputs": mask_inputs}
         # High-resolution feature maps for the SAM head, reshape (HW)BC => BCHW
@@ -758,7 +793,7 @@ class SAM2Base(torch.nn.Module):
             pix_feat = current_vision_feats[-1].permute(1, 2, 0)
             pix_feat = pix_feat.view(-1, self.hidden_dim, *feat_sizes[-1])
             sam_outputs = self._use_mask_as_output(
-                pix_feat, high_res_features, mask_inputs
+                pix_feat, high_res_features, mask_inputs, import_onnx
             )
         else:
             # fused the visual feature with previous memory features in the memory bank
@@ -786,6 +821,7 @@ class SAM2Base(torch.nn.Module):
                 mask_inputs=mask_inputs,
                 high_res_features=high_res_features,
                 multimask_output=multimask_output,
+                import_onnx=import_onnx
             )
         (
             _,

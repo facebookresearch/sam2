@@ -12,6 +12,8 @@ from sam2.build_sam import build_sam2_video_predictor
 sam2_checkpoint = "./checkpoints/sam2_hiera_large.pt"
 model_cfg = "sam2_hiera_l.yaml"
 
+import_onnx = False
+
 predictor = build_sam2_video_predictor(model_cfg, sam2_checkpoint, device=device)
 
 
@@ -65,6 +67,7 @@ _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(
     obj_id=ann_obj_id,
     points=points,
     labels=labels,
+    import_onnx=import_onnx
 )
 
 # show the results on the current (interacted) frame
@@ -77,7 +80,7 @@ plt.show()
 
 # run propagation throughout the video and collect the results in a dict
 video_segments = {}  # video_segments contains the per-frame segmentation results
-for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(inference_state):
+for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(inference_state, import_onnx):
     video_segments[out_frame_idx] = {
         out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
         for i, out_obj_id in enumerate(out_obj_ids)

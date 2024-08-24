@@ -662,7 +662,7 @@ class SAM2VideoPredictor(SAM2Base):
         import_onnx=False
     ):
         """Propagate the input points across frames to track in the entire video."""
-        self.propagate_in_video_preflight(inference_state, import_onnx)
+        self.propagate_in_video_preflight(inference_state, import_onnx=import_onnx)
 
         output_dict = inference_state["output_dict"]
         consolidated_frame_inds = inference_state["consolidated_frame_inds"]
@@ -810,18 +810,27 @@ class SAM2VideoPredictor(SAM2Base):
             device = inference_state["device"]
             image = inference_state["images"][frame_idx].to(device).float().unsqueeze(0)
             if import_onnx:
+                print("begin image encoder onnx")
+                print(image.shape)
                 import onnxruntime
                 model_id = "hiera_l"
                 model = onnxruntime.InferenceSession("image_encoder_"+model_id+".onnx")
-                vision_feat1, vision_feat2, vision_feat3 = model.run(None, {"input_image":image.numpy()})
-                backbone_out = [torch.Tensor(vision_feat1), torch.Tensor(vision_feat2), torch.Tensor(vision_feat3)]
+                vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = model.run(None, {"input_image":image.numpy()})
             else:
-                backbone_out = self.forward_image(image)
+                print("begin image encoder torch")
+                print(image.shape)
+                vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = self.forward_image(image)
+
+            backbone_out = {"vision_features":torch.Tensor(vision_features),
+                            "vision_pos_enc":[torch.Tensor(vision_pos_enc_0), torch.Tensor(vision_pos_enc_1), torch.Tensor(vision_pos_enc_2)],
+                            "backbone_fpn":[torch.Tensor(backbone_fpn_0), torch.Tensor(backbone_fpn_1), torch.Tensor(backbone_fpn_2)]}
+
             # Cache the most recent frame's feature (for repeated interactions with
             # a frame; we can use an LRU cache for more frames in the future).
             inference_state["cached_features"] = {frame_idx: (image, backbone_out)}
 
         # expand the features to have the same dimension as the number of objects
+        print("batch_size", batch_size)
         expanded_image = image.expand(batch_size, -1, -1, -1)
         expanded_backbone_out = {
             "backbone_fpn": backbone_out["backbone_fpn"].copy(),
@@ -861,7 +870,7 @@ class SAM2VideoPredictor(SAM2Base):
             current_vision_feats,
             current_vision_pos_embeds,
             feat_sizes,
-        ) = self._get_image_feature(inference_state, frame_idx, batch_size, import_onnx)
+        ) = self._get_image_feature(inference_state, frame_idx, batch_size, import_onnx=import_onnx)
 
         # point and mask should not appear as input simultaneously on the same frame
         assert point_inputs is None or mask_inputs is None
@@ -917,7 +926,7 @@ class SAM2VideoPredictor(SAM2Base):
         """
         # Retrieve correct image features
         _, _, current_vision_feats, _, feat_sizes = self._get_image_feature(
-            inference_state, frame_idx, batch_size, import_onnx
+            inference_state, frame_idx, batch_size, import_onnx=import_onnx
         )
         maskmem_features, maskmem_pos_enc = self._encode_new_memory(
             current_vision_feats=current_vision_feats,

@@ -125,18 +125,24 @@ class SAM2ImagePredictor:
 
         if export_to_onnx:
             #print("input_image", input_image.shape)
+            self.model.forward = self.model.forward_image
             torch.onnx.export(
                 self.model, (input_image), 'image_encoder_'+model_id+'.onnx',
                 input_names=["input_image"],
-                output_names=["feats1", "feats2", "feats3"],
+                output_names=["vision_features", "vision_pos_enc_0", "vision_pos_enc_1", "vision_pos_enc_2", "backbone_fpn_0", "backbone_fpn_1", "backbone_fpn_2"],
                 verbose=False, opset_version=17
             )
         
         if import_from_onnx:
             model = onnxruntime.InferenceSession("image_encoder_"+model_id+".onnx")
-            vision_feat1, vision_feat2, vision_feat3 = model.run(None, {"input_image":input_image.numpy()})
-            feats = [torch.Tensor(vision_feat1), torch.Tensor(vision_feat2), torch.Tensor(vision_feat3)]
-            #print("feats", vision_feat1.shape, vision_feat2.shape, vision_feat3.shape)
+            vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = model.run(None, {"input_image":input_image.numpy()})
+            print("vision_features", vision_features.shape)
+            print("vision_pos_enc_0", vision_pos_enc_0.shape)
+            print("vision_pos_enc_1", vision_pos_enc_1.shape)
+            print("vision_pos_enc_2", vision_pos_enc_2.shape)
+            print("backbone_fpn_0", backbone_fpn_0.shape)
+            print("backbone_fpn_1", backbone_fpn_1.shape)
+            print("backbone_fpn_2", backbone_fpn_2.shape)
 
         if export_to_tflite:
             import ai_edge_torch
@@ -172,20 +178,24 @@ class SAM2ImagePredictor:
                 edge_model = model
 
             if import_from_tflite:
-                vision_feat1, vision_feat2, vision_feat3 = edge_model(input_image)
-                feats = [torch.Tensor(vision_feat1), torch.Tensor(vision_feat2), torch.Tensor(vision_feat3)]
+                vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = edge_model(input_image)
 
         if not import_from_onnx and (not import_from_tflite or not export_to_tflite):
-            backbone_out = self.model.forward_image(input_image)
-            _, vision_feats, _, _ = self.model._prepare_backbone_features(backbone_out)
-            # Add no_mem_embed, which is added to the lowest rest feat. map during training on videos
-            if self.model.directly_add_no_mem_embed:
-                vision_feats[-1] = vision_feats[-1] + self.model.no_mem_embed
+            vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = self.model.forward_image(input_image)
 
-            feats = [
-                feat.permute(1, 2, 0).view(1, -1, *feat_size)
-                for feat, feat_size in zip(vision_feats[::-1], self._bb_feat_sizes[::-1])
-            ][::-1]
+        backbone_out = {"vision_features":torch.Tensor(vision_features),
+                        "vision_pos_enc":[torch.Tensor(vision_pos_enc_0), torch.Tensor(vision_pos_enc_1), torch.Tensor(vision_pos_enc_2)],
+                        "backbone_fpn":[torch.Tensor(backbone_fpn_0), torch.Tensor(backbone_fpn_1), torch.Tensor(backbone_fpn_2)]}
+
+        _, vision_feats, _, _ = self.model._prepare_backbone_features(backbone_out)
+        # Add no_mem_embed, which is added to the lowest rest feat. map during training on videos
+        if self.model.directly_add_no_mem_embed:
+            vision_feats[-1] = vision_feats[-1] + self.model.no_mem_embed
+
+        feats = [
+            feat.permute(1, 2, 0).view(1, -1, *feat_size)
+            for feat, feat_size in zip(vision_feats[::-1], self._bb_feat_sizes[::-1])
+        ][::-1]
 
         self._features = {"image_embed": feats[-1], "high_res_feats": feats[:-1]}
         self._is_image_set = True

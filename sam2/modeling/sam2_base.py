@@ -192,31 +192,11 @@ class SAM2Base(torch.nn.Module):
     def device(self):
         return next(self.parameters()).device
 
-    def forward(self, input_image):
-        backbone_out = self.forward_image(input_image)
-        _, vision_feats, _, _ = self._prepare_backbone_features(backbone_out)
-
-        # Add no_mem_embed, which is added to the lowest rest feat. map during training on videos
-        if self.directly_add_no_mem_embed:
-            vision_feats[-1] = vision_feats[-1] + self.no_mem_embed
-
-        # Spatial dim for backbone feature maps
-        _bb_feat_sizes = [
-            (256, 256),
-            (128, 128),
-            (64, 64),
-        ]
-
-        feats = [
-            feat.permute(1, 2, 0).view(1, -1, *feat_size)
-            for feat, feat_size in zip(vision_feats[::-1], _bb_feat_sizes[::-1])
-        ][::-1]
-        return feats
-        
-        #raise NotImplementedError(
-        #    "Please use the corresponding methods in SAM2VideoPredictor for inference."
-        #    "See notebooks/video_predictor_example.ipynb for an example."
-        #)
+    def forward(self):
+        raise NotImplementedError(
+            "Please use the corresponding methods in SAM2VideoPredictor for inference."
+            "See notebooks/video_predictor_example.ipynb for an example."
+        )
 
     def _build_sam_heads(self):
         """Build SAM-style prompt encoder and mask decoder."""
@@ -353,7 +333,7 @@ class SAM2Base(torch.nn.Module):
             sam_mask_prompt = None
 
         if import_onnx:
-            print("begin onnx mode")
+            print("begin mask decoder onnx")
             if sam_mask_prompt != None:
                 raise("currently not supported mask prompt")
             import onnxruntime
@@ -365,6 +345,7 @@ class SAM2Base(torch.nn.Module):
             dense_pe = torch.Tensor(dense_pe)
 
             model = onnxruntime.InferenceSession("mask_decoder_"+model_id+".onnx")
+            print("backbone_features", backbone_features.shape)
             masks, iou_pred, sam_tokens_out, object_score_logits  = model.run(None, {
                 "image_embeddings":backbone_features.numpy(),
                 "image_pe": dense_pe.numpy(),
@@ -378,7 +359,13 @@ class SAM2Base(torch.nn.Module):
             sam_tokens_out = torch.Tensor(sam_tokens_out)
             object_score_logits = torch.Tensor(object_score_logits)
             low_res_multimasks, ious, sam_output_tokens, object_score_logits  = self.sam_mask_decoder.forward_postprocess(masks, iou_pred, sam_tokens_out, object_score_logits, multimask_output)
+            print(low_res_multimasks.shape)
+            print(ious.shape)
+            print(sam_output_tokens.shape)
+            print(object_score_logits.shape)
         else:
+            print("begin mask decoder torch")
+            print("backbone_features", backbone_features.shape)
             sparse_embeddings, dense_embeddings = self.sam_prompt_encoder.forward_normal(
                 coords=sam_point_coords,
                 labels=sam_point_labels,
@@ -401,6 +388,10 @@ class SAM2Base(torch.nn.Module):
                 high_res_features1=high_res_features[0],
                 high_res_features2=high_res_features[1],
             )
+            print(low_res_multimasks.shape)
+            print(ious.shape)
+            print(sam_output_tokens.shape)
+            print(object_score_logits.shape)
 
         if self.pred_obj_scores:
             is_obj_appearing = object_score_logits > 0
@@ -525,7 +516,7 @@ class SAM2Base(torch.nn.Module):
             backbone_out["backbone_fpn"][1] = self.sam_mask_decoder.conv_s1(
                 backbone_out["backbone_fpn"][1]
             )
-        return backbone_out
+        return backbone_out["vision_features"], backbone_out["vision_pos_enc"][0], backbone_out["vision_pos_enc"][1], backbone_out["vision_pos_enc"][2], backbone_out["backbone_fpn"][0], backbone_out["backbone_fpn"][1], backbone_out["backbone_fpn"][2]
 
     def _prepare_backbone_features(self, backbone_out):
         """Prepare and flatten visual features."""
@@ -791,7 +782,7 @@ class SAM2Base(torch.nn.Module):
             pix_feat = current_vision_feats[-1].permute(1, 2, 0)
             pix_feat = pix_feat.view(-1, self.hidden_dim, *feat_sizes[-1])
             sam_outputs = self._use_mask_as_output(
-                pix_feat, high_res_features, mask_inputs, import_onnx
+                pix_feat, high_res_features, mask_inputs, import_onnx=import_onnx
             )
         else:
             # fused the visual feature with previous memory features in the memory bank

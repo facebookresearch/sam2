@@ -593,7 +593,7 @@ class SAM2ImagePredictor:
                 self.model.sam_mask_decoder, (self._features["image_embed"][img_idx].unsqueeze(0), dense_pe, sparse_embeddings, dense_embeddings, batched_mode, high_res_features[0], high_res_features[1]),
                 'mask_decoder_'+model_id+'.onnx',
                 input_names=["image_embeddings", "image_pe", "sparse_prompt_embeddings", "dense_prompt_embeddings", "repeat_image", "high_res_features1", "high_res_features2"],
-                output_names=["low_res_masks", "iou_predictions"],
+                output_names=["masks", "iou_pred", "sam_tokens_out", "object_score_logits"],
                 dynamic_axes={
                     'sparse_prompt_embeddings': {1: 'n'},
                 },
@@ -616,8 +616,8 @@ class SAM2ImagePredictor:
             low_res_masks, iou_predictions, _, _  = self.model.sam_mask_decoder.forward_postprocess(masks, iou_pred, sam_tokens_out, object_score_logits, multimask_output)
 
         if export_to_tflite:
-            self.model.sam_mask_decoder.forward = self.model.sam_mask_decoder.forward_normal
-            sample_inputs = (self._features["image_embed"][img_idx].unsqueeze(0), dense_pe, sparse_embeddings, dense_embeddings, multimask_output, batched_mode, high_res_features[0], high_res_features[1])
+            self.model.sam_mask_decoder.forward = self.model.sam_mask_decoder.forward_masks
+            sample_inputs = (self._features["image_embed"][img_idx].unsqueeze(0), dense_pe, sparse_embeddings, dense_embeddings, batched_mode, high_res_features[0], high_res_features[1])
 
             if not tflite_int8:
                 import ai_edge_torch
@@ -634,7 +634,7 @@ class SAM2ImagePredictor:
                 )
                 model = torch._export.capture_pre_autograd_graph(self.model.sam_mask_decoder, sample_inputs)
                 model = quantize_pt2e.prepare_pt2e(model, quantizer)
-                model(self._features["image_embed"][img_idx].unsqueeze(0), dense_pe, sparse_embeddings, dense_embeddings, multimask_output, batched_mode, high_res_features[0], high_res_features[1]) # calibration
+                model(self._features["image_embed"][img_idx].unsqueeze(0), dense_pe, sparse_embeddings, dense_embeddings, batched_mode, high_res_features[0], high_res_features[1]) # calibration
                 model = quantize_pt2e.convert_pt2e(model, fold_quantize=False)
 
                 with_quantizer = ai_edge_torch.convert(
@@ -649,17 +649,18 @@ class SAM2ImagePredictor:
             if import_from_tflite:
                 multimask_output_np = np.zeros((1), dtype=bool)
                 batched_mode_np = np.zeros((1), dtype=bool)
-                if multimask_output:
-                    multimask_output_np[0] = True
                 if batched_mode:
                     batched_mode_np[0] = True
-                low_res_masks, iou_predictions, _, _ = edge_model(self._features["image_embed"][img_idx].unsqueeze(0), dense_pe, sparse_embeddings, dense_embeddings, multimask_output_np, batched_mode_np, high_res_features[0], high_res_features[1])
-                low_res_masks = torch.Tensor(low_res_masks)
-                iou_predictions = torch.Tensor(iou_predictions)
+                masks, iou_pred, sam_tokens_out, object_score_logits = edge_model(self._features["image_embed"][img_idx].unsqueeze(0), dense_pe, sparse_embeddings, dense_embeddings, batched_mode_np, high_res_features[0], high_res_features[1])
+                masks = torch.Tensor(masks)
+                iou_pred = torch.Tensor(iou_pred)
+                sam_tokens_out = torch.Tensor(sam_tokens_out)
+                object_score_logits = torch.Tensor(object_score_logits)
+                low_res_masks, iou_predictions, _, _  = self.model.sam_mask_decoder.forward_postprocess(masks, iou_pred, sam_tokens_out, object_score_logits, multimask_output)
 
         if not import_from_onnx and (not import_from_tflite or not export_to_tflite):
             self.model.sam_mask_decoder.forward = self.model.sam_mask_decoder.forward_normal
-            low_res_masks, iou_predictions, _, _ = self.model.sam_mask_decoder(
+            masks, iou_pred, sam_tokens_out, object_score_logits = self.model.sam_mask_decoder(
                 image_embeddings=self._features["image_embed"][img_idx].unsqueeze(0),
                 image_pe=dense_pe,
                 sparse_prompt_embeddings=sparse_embeddings,

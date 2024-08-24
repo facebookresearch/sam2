@@ -305,6 +305,7 @@ class SAM2VideoPredictor(SAM2Base):
             is_cond=is_cond,
             run_mem_encoder=False,
             consolidate_at_video_res=True,
+            import_onnx=import_onnx
         )
         _, video_res_masks = self._get_orig_video_res_output(
             inference_state, consolidated_out["pred_masks_video_res"]
@@ -395,6 +396,7 @@ class SAM2VideoPredictor(SAM2Base):
             is_cond=is_cond,
             run_mem_encoder=False,
             consolidate_at_video_res=True,
+            import_onnx=import_onnx
         )
         _, video_res_masks = self._get_orig_video_res_output(
             inference_state, consolidated_out["pred_masks_video_res"]

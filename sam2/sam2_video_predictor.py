@@ -43,6 +43,7 @@ class SAM2VideoPredictor(SAM2Base):
         offload_video_to_cpu=False,
         offload_state_to_cpu=False,
         async_loading_frames=False,
+        import_onnx=False
     ):
         """Initialize an inference state."""
         compute_device = self.device  # device of the model
@@ -103,7 +104,7 @@ class SAM2VideoPredictor(SAM2Base):
         inference_state["tracking_has_started"] = False
         inference_state["frames_already_tracked"] = {}
         # Warm up the visual backbone and cache the image feature on frame 0
-        self._get_image_feature(inference_state, frame_idx=0, batch_size=1)
+        self._get_image_feature(inference_state, frame_idx=0, batch_size=1, import_onnx=import_onnx)
         return inference_state
 
     @classmethod
@@ -499,7 +500,7 @@ class SAM2VideoPredictor(SAM2Base):
                 if run_mem_encoder:
                     if empty_mask_ptr is None:
                         empty_mask_ptr = self._get_empty_mask_ptr(
-                            inference_state, frame_idx, import_onnx
+                            inference_state, frame_idx, import_onnx=import_onnx
                         )
                     # fill object pointer with a dummy pointer (based on an empty mask)
                     consolidated_out["obj_ptr"][obj_idx : obj_idx + 1] = empty_mask_ptr
@@ -562,7 +563,7 @@ class SAM2VideoPredictor(SAM2Base):
             current_vision_feats,
             current_vision_pos_embeds,
             feat_sizes,
-        ) = self._get_image_feature(inference_state, frame_idx, batch_size, import_onnx)
+        ) = self._get_image_feature(inference_state, frame_idx, batch_size, import_onnx=import_onnx)
 
         # Feed the empty mask and image feature above to get a dummy object pointer
         current_out = self.track_step(

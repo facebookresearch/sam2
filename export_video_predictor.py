@@ -50,7 +50,7 @@ frame_names = [
 ]
 frame_names.sort(key=lambda p: int(os.path.splitext(p)[0]))
 
-inference_state = predictor.init_state(video_path=video_dir)
+inference_state = predictor.init_state(video_path=video_dir, import_onnx=import_onnx)
 predictor.reset_state(inference_state)
 
 ann_frame_idx = 0  # the frame index we interact with
@@ -80,7 +80,7 @@ plt.show()
 
 # run propagation throughout the video and collect the results in a dict
 video_segments = {}  # video_segments contains the per-frame segmentation results
-for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(inference_state, import_onnx):
+for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(inference_state, import_onnx=import_onnx):
     video_segments[out_frame_idx] = {
         out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
         for i, out_obj_id in enumerate(out_obj_ids)

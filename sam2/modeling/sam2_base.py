@@ -115,10 +115,12 @@ class SAM2Base(torch.nn.Module):
         # Part 2: memory attention to condition current frame's visual features
         # with memories (and obj ptrs) from past frames
         self.memory_attention = memory_attention
+        self.memory_attention_onnx_exported = False
         self.hidden_dim = memory_attention.d_model
 
         # Part 3: memory encoder for the previous frame's outputs
         self.memory_encoder = memory_encoder
+        self.memory_encoder_onnx_exported = False
         self.mem_dim = self.hidden_dim
         if hasattr(self.memory_encoder, "out_proj") and hasattr(
             self.memory_encoder.out_proj, "weight"
@@ -255,7 +257,7 @@ class SAM2Base(torch.nn.Module):
         mask_inputs=None,
         high_res_features=None,
         multimask_output=False,
-        import_onnx=False
+        import_from_onnx=False
     ):
         """
         Forward SAM prompt encoders and mask heads.
@@ -332,7 +334,7 @@ class SAM2Base(torch.nn.Module):
             # a learned `no_mask_embed` to indicate no mask input in this case).
             sam_mask_prompt = None
 
-        if import_onnx:
+        if import_from_onnx:
             print("begin mask decoder onnx")
             if sam_mask_prompt != None:
                 raise("currently not supported mask prompt")
@@ -451,7 +453,7 @@ class SAM2Base(torch.nn.Module):
             object_score_logits,
         )
 
-    def _use_mask_as_output(self, backbone_features, high_res_features, mask_inputs, import_onnx):
+    def _use_mask_as_output(self, backbone_features, high_res_features, mask_inputs, import_from_onnx):
         """
         Directly turn binary `mask_inputs` into a output mask logits without using SAM.
         (same input and output shapes as in _forward_sam_heads above).
@@ -480,7 +482,7 @@ class SAM2Base(torch.nn.Module):
                 backbone_features=backbone_features,
                 mask_inputs=self.mask_downsample(mask_inputs_float),
                 high_res_features=high_res_features,
-                import_onnx=import_onnx
+                import_from_onnx=import_from_onnx
             )
         # In this method, we are treating mask_input as output, e.g. using it directly to create spatial mem;
         # Below, we follow the same design axiom to use mask_input to decide if obj appears or not instead of relying
@@ -544,6 +546,9 @@ class SAM2Base(torch.nn.Module):
         output_dict,
         num_frames,
         track_in_reverse=False,  # tracking in reverse time order (for demo usage)
+        export_to_onnx=False,
+        import_from_onnx=False,
+        model_id=None
     ):
         """Fuse the current frame's visual feature map with previous memory."""
         B = current_vision_feats[-1].size(1)  # batch size on this frame
@@ -694,13 +699,34 @@ class SAM2Base(torch.nn.Module):
         memory = torch.cat(to_cat_memory, dim=0)
         memory_pos_embed = torch.cat(to_cat_memory_pos_embed, dim=0)
 
-        pix_feat_with_mem = self.memory_attention(
-            curr=current_vision_feats,
-            curr_pos=current_vision_pos_embeds,
-            memory=memory,
-            memory_pos=memory_pos_embed,
-            num_obj_ptr_tokens=num_obj_ptr_tokens,
-        )
+        if export_to_onnx and not self.memory_attention_onnx_exported:
+            self.memory_attention_onnx_exported = True
+            print("current_vision_feats", current_vision_feats[0].shape, current_vision_feats[0].dtype)
+            print("memory", memory.shape, memory.dtype)
+            print("current_vision_pos_embeds", current_vision_pos_embeds[0].shape, current_vision_pos_embeds[0].dtype)
+            print("memory_pos_embed", memory_pos_embed.shape, memory_pos_embed.dtype)
+            print("num_obj_ptr_tokens", num_obj_ptr_tokens)
+            torch.onnx.export(
+                self.memory_attention, (current_vision_feats[0], memory, current_vision_pos_embeds[0], memory_pos_embed, num_obj_ptr_tokens), 'memory_attention_'+model_id+'.onnx',
+                input_names=["curr", "memory", "curr_pos", "memory_pos", "num_obj_ptr_tokens"],
+                output_names=["pix_feat"],
+                verbose=False, opset_version=17
+            )
+
+        if import_from_onnx:
+            import onnxruntime
+            model = onnxruntime.InferenceSession("memory_attention_"+model_id+".onnx")
+            pix_feat_with_mem = model.run(None, {"curr":current_vision_feats[0].numpy(), "memory":memory.numpy(), "curr_pos":current_vision_pos_embeds[0].numpy(), "memory_pos":memory_pos_embed.numpy(), "num_obj_ptr_tokens":num_obj_ptr_tokens.numpy()})
+        
+        if not import_from_onnx:
+            pix_feat_with_mem = self.memory_attention(
+                curr=current_vision_feats,
+                curr_pos=current_vision_pos_embeds,
+                memory=memory,
+                memory_pos=memory_pos_embed,
+                num_obj_ptr_tokens=num_obj_ptr_tokens,
+            )
+
         # reshape the output (HW)BC => BCHW
         pix_feat_with_mem = pix_feat_with_mem.permute(1, 2, 0).view(B, C, H, W)
         return pix_feat_with_mem
@@ -711,6 +737,9 @@ class SAM2Base(torch.nn.Module):
         feat_sizes,
         pred_masks_high_res,
         is_mask_from_pts,
+        export_to_onnx = False,
+        import_from_onnx = False,
+        model_id = None
     ):
         """Encode the current image and its prediction into a memory feature."""
         B = current_vision_feats[-1].size(1)  # batch size on this frame
@@ -737,9 +766,27 @@ class SAM2Base(torch.nn.Module):
             mask_for_mem = mask_for_mem * self.sigmoid_scale_for_mem_enc
         if self.sigmoid_bias_for_mem_enc != 0.0:
             mask_for_mem = mask_for_mem + self.sigmoid_bias_for_mem_enc
-        maskmem_out = self.memory_encoder(
-            pix_feat, mask_for_mem, skip_mask_sigmoid=True  # sigmoid already applied
-        )
+
+        if export_to_onnx and not self.memory_encoder_onnx_exported:
+            self.memory_encoder_onnx_exported = True
+            torch.onnx.export(
+                self.memory_encoder, (pix_feat, mask_for_mem, False), 'memory_encoder_'+model_id+'.onnx',
+                input_names=["pix_feat", "masks"],
+                output_names=["vision_features", "vision_pos_enc"],
+                verbose=False, opset_version=17
+            )
+
+        if import_from_onnx:
+            import onnxruntime
+            model = onnxruntime.InferenceSession("memory_encoder_"+model_id+".onnx")
+            vision_features, vision_pos_enc = model.run(None, {"pix_feat":pix_feat.numpy(), "masks":mask_for_mem.numpy()})
+            maskmem_out = {"vision_features": vision_features, "vision_pos_enc": [vision_pos_enc]}
+
+        if not import_from_onnx:
+            maskmem_out = self.memory_encoder(
+                pix_feat, mask_for_mem, skip_mask_sigmoid=True  # sigmoid already applied
+            )
+
         maskmem_features = maskmem_out["vision_features"]
         maskmem_pos_enc = maskmem_out["vision_pos_enc"]
 
@@ -765,7 +812,10 @@ class SAM2Base(torch.nn.Module):
         run_mem_encoder=True,
         # The previously predicted SAM mask logits (which can be fed together with new clicks in demo).
         prev_sam_mask_logits=None,
-        import_onnx=False
+        # ONNX Export
+        export_to_onnx=False,
+        import_from_onnx=False,
+        model_id=None
     ):
         current_out = {"point_inputs": point_inputs, "mask_inputs": mask_inputs}
         # High-resolution feature maps for the SAM head, reshape (HW)BC => BCHW
@@ -782,7 +832,7 @@ class SAM2Base(torch.nn.Module):
             pix_feat = current_vision_feats[-1].permute(1, 2, 0)
             pix_feat = pix_feat.view(-1, self.hidden_dim, *feat_sizes[-1])
             sam_outputs = self._use_mask_as_output(
-                pix_feat, high_res_features, mask_inputs, import_onnx=import_onnx
+                pix_feat, high_res_features, mask_inputs, import_from_onnx=import_from_onnx
             )
         else:
             # fused the visual feature with previous memory features in the memory bank
@@ -795,6 +845,9 @@ class SAM2Base(torch.nn.Module):
                 output_dict=output_dict,
                 num_frames=num_frames,
                 track_in_reverse=track_in_reverse,
+                export_to_onnx=export_to_onnx,
+                import_from_onnx=import_from_onnx,
+                model_id=model_id
             )
             # apply SAM-style segmentation head
             # here we might feed previously predicted low-res SAM mask logits into the SAM mask decoder,
@@ -810,7 +863,7 @@ class SAM2Base(torch.nn.Module):
                 mask_inputs=mask_inputs,
                 high_res_features=high_res_features,
                 multimask_output=multimask_output,
-                import_onnx=import_onnx
+                import_from_onnx=import_from_onnx
             )
         (
             _,
@@ -835,6 +888,9 @@ class SAM2Base(torch.nn.Module):
                 feat_sizes=feat_sizes,
                 pred_masks_high_res=high_res_masks_for_mem_enc,
                 is_mask_from_pts=(point_inputs is not None),
+                export_to_onnx=export_to_onnx,
+                import_from_onnx=import_from_onnx,
+                model_id=model_id
             )
             current_out["maskmem_features"] = maskmem_features
             current_out["maskmem_pos_enc"] = maskmem_pos_enc

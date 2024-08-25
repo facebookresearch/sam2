@@ -43,7 +43,7 @@ class SAM2VideoPredictor(SAM2Base):
         offload_video_to_cpu=False,
         offload_state_to_cpu=False,
         async_loading_frames=False,
-        import_onnx=False
+        import_from_onnx=False
     ):
         """Initialize an inference state."""
         compute_device = self.device  # device of the model
@@ -104,7 +104,7 @@ class SAM2VideoPredictor(SAM2Base):
         inference_state["tracking_has_started"] = False
         inference_state["frames_already_tracked"] = {}
         # Warm up the visual backbone and cache the image feature on frame 0
-        self._get_image_feature(inference_state, frame_idx=0, batch_size=1, import_onnx=import_onnx)
+        self._get_image_feature(inference_state, frame_idx=0, batch_size=1, import_from_onnx=import_from_onnx)
         return inference_state
 
     @classmethod
@@ -177,7 +177,9 @@ class SAM2VideoPredictor(SAM2Base):
         clear_old_points=True,
         normalize_coords=True,
         box=None,
-        import_onnx=False
+        import_from_onnx=False,
+        export_to_onnx=False,
+        model_id=None
     ):
         """Add new points to a frame."""
         obj_idx = self._obj_id_to_idx(inference_state, obj_id)
@@ -293,7 +295,9 @@ class SAM2VideoPredictor(SAM2Base):
             # them into memory.
             run_mem_encoder=False,
             prev_sam_mask_logits=prev_sam_mask_logits,
-            import_onnx=import_onnx
+            import_from_onnx=import_from_onnx,
+            export_to_onnx=export_to_onnx,
+            model_id=model_id
         )
         # Add the output to the output dict (to be used as future memory)
         obj_temp_output_dict[storage_key][frame_idx] = current_out
@@ -306,7 +310,7 @@ class SAM2VideoPredictor(SAM2Base):
             is_cond=is_cond,
             run_mem_encoder=False,
             consolidate_at_video_res=True,
-            import_onnx=import_onnx
+            import_from_onnx=import_from_onnx, export_to_onnx=export_to_onnx, model_id=model_id
         )
         _, video_res_masks = self._get_orig_video_res_output(
             inference_state, consolidated_out["pred_masks_video_res"]
@@ -324,7 +328,9 @@ class SAM2VideoPredictor(SAM2Base):
         frame_idx,
         obj_id,
         mask,
-        import_onnx=False
+        import_from_onnx=False,
+        export_to_onnx=False,
+        model_id=None
     ):
         """Add new mask to a frame."""
         obj_idx = self._obj_id_to_idx(inference_state, obj_id)
@@ -384,7 +390,9 @@ class SAM2VideoPredictor(SAM2Base):
             # allows us to enforce non-overlapping constraints on all objects before encoding
             # them into memory.
             run_mem_encoder=False,
-            import_onnx=import_onnx
+            import_from_onnx=import_from_onnx,
+            export_to_onnx=export_to_onnx,
+            model_id=model_id
         )
         # Add the output to the output dict (to be used as future memory)
         obj_temp_output_dict[storage_key][frame_idx] = current_out
@@ -397,7 +405,7 @@ class SAM2VideoPredictor(SAM2Base):
             is_cond=is_cond,
             run_mem_encoder=False,
             consolidate_at_video_res=True,
-            import_onnx=import_onnx
+            import_from_onnx=import_from_onnx, export_to_onnx=export_to_onnx, model_id=model_id
         )
         _, video_res_masks = self._get_orig_video_res_output(
             inference_state, consolidated_out["pred_masks_video_res"]
@@ -433,7 +441,9 @@ class SAM2VideoPredictor(SAM2Base):
         is_cond,
         run_mem_encoder,
         consolidate_at_video_res=False,
-        import_onnx=False
+        import_from_onnx=False,
+        export_to_onnx=False,
+        model_id=None
     ):
         """
         Consolidate the per-object temporary outputs in `temp_output_dict_per_obj` on
@@ -500,7 +510,7 @@ class SAM2VideoPredictor(SAM2Base):
                 if run_mem_encoder:
                     if empty_mask_ptr is None:
                         empty_mask_ptr = self._get_empty_mask_ptr(
-                            inference_state, frame_idx, import_onnx=import_onnx
+                            inference_state, frame_idx, import_from_onnx=import_from_onnx, export_to_onnx=export_to_onnx, model_id=model_id
                         )
                     # fill object pointer with a dummy pointer (based on an empty mask)
                     consolidated_out["obj_ptr"][obj_idx : obj_idx + 1] = empty_mask_ptr
@@ -539,14 +549,14 @@ class SAM2VideoPredictor(SAM2Base):
                 batch_size=batch_size,
                 high_res_masks=high_res_masks,
                 is_mask_from_pts=True,  # these frames are what the user interacted with
-                import_onnx=import_onnx
+                import_from_onnx=import_from_onnx
             )
             consolidated_out["maskmem_features"] = maskmem_features
             consolidated_out["maskmem_pos_enc"] = maskmem_pos_enc
 
         return consolidated_out
 
-    def _get_empty_mask_ptr(self, inference_state, frame_idx, import_onnx):
+    def _get_empty_mask_ptr(self, inference_state, frame_idx, import_from_onnx, export_to_onnx, model_id):
         """Get a dummy object pointer based on an empty mask on the current frame."""
         # A dummy (empty) mask with a single object
         batch_size = 1
@@ -563,7 +573,7 @@ class SAM2VideoPredictor(SAM2Base):
             current_vision_feats,
             current_vision_pos_embeds,
             feat_sizes,
-        ) = self._get_image_feature(inference_state, frame_idx, batch_size, import_onnx=import_onnx)
+        ) = self._get_image_feature(inference_state, frame_idx, batch_size, import_from_onnx=import_from_onnx)
 
         # Feed the empty mask and image feature above to get a dummy object pointer
         current_out = self.track_step(
@@ -579,12 +589,14 @@ class SAM2VideoPredictor(SAM2Base):
             track_in_reverse=False,
             run_mem_encoder=False,
             prev_sam_mask_logits=None,
-            import_onnx=import_onnx
+            import_from_onnx=import_from_onnx,
+            export_to_onnx=export_to_onnx,
+            model_id=model_id
         )
         return current_out["obj_ptr"]
 
     @torch.inference_mode()
-    def propagate_in_video_preflight(self, inference_state, import_onnx=False):
+    def propagate_in_video_preflight(self, inference_state, import_from_onnx=False, export_to_onnx=False, model_id=None):
         """Prepare inference_state and consolidate temporary outputs before tracking."""
         # Tracking has started and we don't allow adding new objects until session is reset.
         inference_state["tracking_has_started"] = True
@@ -611,7 +623,7 @@ class SAM2VideoPredictor(SAM2Base):
             # consolidate the temporary output across all objects on this frame
             for frame_idx in temp_frame_inds:
                 consolidated_out = self._consolidate_temp_output_across_obj(
-                    inference_state, frame_idx, is_cond=is_cond, run_mem_encoder=True, import_onnx=import_onnx
+                    inference_state, frame_idx, is_cond=is_cond, run_mem_encoder=True, import_from_onnx=import_from_onnx, export_to_onnx=export_to_onnx, model_id=model_id
                 )
                 # merge them into "output_dict" and also create per-object slices
                 output_dict[storage_key][frame_idx] = consolidated_out
@@ -660,10 +672,12 @@ class SAM2VideoPredictor(SAM2Base):
         start_frame_idx=None,
         max_frame_num_to_track=None,
         reverse=False,
-        import_onnx=False
+        import_from_onnx=False,
+        export_to_onnx=False,
+        model_id=None
     ):
         """Propagate the input points across frames to track in the entire video."""
-        self.propagate_in_video_preflight(inference_state, import_onnx=import_onnx)
+        self.propagate_in_video_preflight(inference_state, import_from_onnx=import_from_onnx, export_to_onnx=export_to_onnx, model_id=model_id)
 
         output_dict = inference_state["output_dict"]
         consolidated_frame_inds = inference_state["consolidated_frame_inds"]
@@ -723,7 +737,9 @@ class SAM2VideoPredictor(SAM2Base):
                     mask_inputs=None,
                     reverse=reverse,
                     run_mem_encoder=True,
-                    import_onnx=import_onnx
+                    import_from_onnx=import_from_onnx,
+                    export_to_onnx=export_to_onnx,
+                    model_id=model_id
                 )
                 output_dict[storage_key][frame_idx] = current_out
             # Create slices of per-object outputs for subsequent interaction with each
@@ -800,7 +816,7 @@ class SAM2VideoPredictor(SAM2Base):
         inference_state["tracking_has_started"] = False
         inference_state["frames_already_tracked"].clear()
 
-    def _get_image_feature(self, inference_state, frame_idx, batch_size, import_onnx = False):
+    def _get_image_feature(self, inference_state, frame_idx, batch_size, import_from_onnx = False):
         """Compute the image features on a given frame."""
         # Look up in the cache first
         image, backbone_out = inference_state["cached_features"].get(
@@ -810,7 +826,7 @@ class SAM2VideoPredictor(SAM2Base):
             # Cache miss -- we will run inference on a single image
             device = inference_state["device"]
             image = inference_state["images"][frame_idx].to(device).float().unsqueeze(0)
-            if import_onnx:
+            if import_from_onnx:
                 print("begin image encoder onnx")
                 print(image.shape)
                 import onnxruntime
@@ -861,7 +877,9 @@ class SAM2VideoPredictor(SAM2Base):
         reverse,
         run_mem_encoder,
         prev_sam_mask_logits=None,
-        import_onnx=False
+        import_from_onnx=False,
+        export_to_onnx=False,
+        model_id=None
     ):
         """Run tracking on a single frame based on current inputs and previous memory."""
         # Retrieve correct image features
@@ -871,7 +889,7 @@ class SAM2VideoPredictor(SAM2Base):
             current_vision_feats,
             current_vision_pos_embeds,
             feat_sizes,
-        ) = self._get_image_feature(inference_state, frame_idx, batch_size, import_onnx=import_onnx)
+        ) = self._get_image_feature(inference_state, frame_idx, batch_size, import_from_onnx=import_from_onnx)
 
         # point and mask should not appear as input simultaneously on the same frame
         assert point_inputs is None or mask_inputs is None
@@ -888,7 +906,9 @@ class SAM2VideoPredictor(SAM2Base):
             track_in_reverse=reverse,
             run_mem_encoder=run_mem_encoder,
             prev_sam_mask_logits=prev_sam_mask_logits,
-            import_onnx=import_onnx
+            import_from_onnx=import_from_onnx,
+            export_to_onnx=export_to_onnx,
+            model_id=model_id
         )
 
         # optionally offload the output to CPU memory to save GPU space
@@ -918,7 +938,7 @@ class SAM2VideoPredictor(SAM2Base):
         return compact_current_out, pred_masks_gpu
 
     def _run_memory_encoder(
-        self, inference_state, frame_idx, batch_size, high_res_masks, is_mask_from_pts, import_onnx
+        self, inference_state, frame_idx, batch_size, high_res_masks, is_mask_from_pts, import_from_onnx
     ):
         """
         Run the memory encoder on `high_res_masks`. This is usually after applying
@@ -927,7 +947,7 @@ class SAM2VideoPredictor(SAM2Base):
         """
         # Retrieve correct image features
         _, _, current_vision_feats, _, feat_sizes = self._get_image_feature(
-            inference_state, frame_idx, batch_size, import_onnx=import_onnx
+            inference_state, frame_idx, batch_size, import_from_onnx=import_from_onnx
         )
         maskmem_features, maskmem_pos_enc = self._encode_new_memory(
             current_vision_feats=current_vision_feats,

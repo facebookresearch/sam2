@@ -12,7 +12,9 @@ from sam2.build_sam import build_sam2_video_predictor
 sam2_checkpoint = "./checkpoints/sam2_hiera_large.pt"
 model_cfg = "sam2_hiera_l.yaml"
 
-import_onnx = True
+export_to_onnx = True
+model_id = "hiera_l"
+import_from_onnx = True
 
 predictor = build_sam2_video_predictor(model_cfg, sam2_checkpoint, device=device)
 
@@ -50,7 +52,7 @@ frame_names = [
 ]
 frame_names.sort(key=lambda p: int(os.path.splitext(p)[0]))
 
-inference_state = predictor.init_state(video_path=video_dir, import_onnx=import_onnx)
+inference_state = predictor.init_state(video_path=video_dir, import_from_onnx=import_from_onnx)
 predictor.reset_state(inference_state)
 
 ann_frame_idx = 0  # the frame index we interact with
@@ -67,7 +69,9 @@ _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(
     obj_id=ann_obj_id,
     points=points,
     labels=labels,
-    import_onnx=import_onnx
+    import_from_onnx=import_from_onnx,
+    export_to_onnx=export_to_onnx,
+    model_id=model_id
 )
 
 # show the results on the current (interacted) frame
@@ -80,7 +84,7 @@ plt.show()
 
 # run propagation throughout the video and collect the results in a dict
 video_segments = {}  # video_segments contains the per-frame segmentation results
-for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(inference_state, import_onnx=import_onnx):
+for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(inference_state, import_from_onnx=import_from_onnx, export_to_onnx=export_to_onnx, model_id=model_id):
     video_segments[out_frame_idx] = {
         out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
         for i, out_obj_id in enumerate(out_obj_ids)

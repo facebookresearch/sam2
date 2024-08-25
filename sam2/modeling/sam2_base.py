@@ -780,7 +780,7 @@ class SAM2Base(torch.nn.Module):
             import onnxruntime
             model = onnxruntime.InferenceSession("memory_encoder_"+model_id+".onnx")
             vision_features, vision_pos_enc = model.run(None, {"pix_feat":pix_feat.numpy(), "masks":mask_for_mem.numpy()})
-            maskmem_out = {"vision_features": vision_features, "vision_pos_enc": [vision_pos_enc]}
+            maskmem_out = {"vision_features": torch.Tensor(vision_features), "vision_pos_enc": [torch.Tensor(vision_pos_enc)]}
 
         if not import_from_onnx:
             maskmem_out = self.memory_encoder(

@@ -527,19 +527,6 @@ class SAM2ImagePredictor:
             dense_embeddings = torch.Tensor(dense_embeddings)
             dense_pe = torch.Tensor(dense_pe)
 
-        #if export_to_onnx:
-            #self.model.sam_prompt_encoder.forward = self.model.sam_prompt_encoder.forward_dense
-            #if mask_input is None:
-            #    mask_input_non_zero = np.zeros((1, 1024, 1024))
-            #else:
-            #    mask_input_non_zero = mask_input
-            #torch.onnx.export(
-            #    self.model.sam_prompt_encoder, (mask_input_non_zero), 'prompt_encoder_dense_'+model_id+'.onnx',
-            #    input_names=["mask_input"],
-            #    output_names=["sparse_embeddings", "dense_embeddings"],
-            #    verbose=False, opset_version=17
-            #)
-
         if export_to_tflite:
             import ai_edge_torch
             sample_inputs = (concat_points[0], concat_points[1], mask_input_dummy, masks_enable)
@@ -577,14 +564,13 @@ class SAM2ImagePredictor:
                 dense_pe = torch.Tensor(dense_pe)
 
         if not import_from_onnx and (not import_from_tflite or not export_to_tflite or tflite_int8):
-            sparse_embeddings, dense_embeddings = self.model.sam_prompt_encoder.forward(
+            sparse_embeddings, dense_embeddings, dense_pe = self.model.sam_prompt_encoder.forward(
                 coords=concat_points[0],
                 labels=concat_points[1],
                 #boxes=None,
                 masks=mask_input_dummy,
                 masks_enable=masks_enable
             )
-            dense_pe = self.model.sam_prompt_encoder.get_dense_pe()
 
         # Predict masks
         batched_mode = (
@@ -680,6 +666,7 @@ class SAM2ImagePredictor:
                 high_res_features1=high_res_features[0],
                 high_res_features2=high_res_features[1],
             )
+            low_res_masks, iou_predictions, _, _  = self.model.sam_mask_decoder.forward_postprocess(masks, iou_pred, sam_tokens_out, object_score_logits, multimask_output)
 
         # Upscale the masks to the original image resolution
         masks = self._transforms.postprocess_masks(

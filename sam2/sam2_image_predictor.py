@@ -148,6 +148,7 @@ class SAM2ImagePredictor:
             import ai_edge_torch
             import tensorflow as tf
             sample_inputs = (input_image,)
+            self.model.forward = self.model.forward_image
 
             if not tflite_int8:
                 tfl_converter_flags = {'target_spec': {'supported_ops': [tf.lite.OpsSet.TFLITE_BUILTINS, tf.lite.OpsSet.SELECT_TF_OPS]}}
@@ -545,7 +546,7 @@ class SAM2ImagePredictor:
 
             if not tflite_int8:
                 edge_model = ai_edge_torch.convert(self.model.sam_prompt_encoder, sample_inputs)
-                edge_model.export("prompt_encoder_sparse_"+model_id+".tflite")
+                edge_model.export("prompt_encoder_"+model_id+".tflite")
 
             if False:#tflite_int8: # labelがint64で量子化できない
                 from ai_edge_torch.quantize import pt2e_quantizer
@@ -565,7 +566,7 @@ class SAM2ImagePredictor:
                     sample_inputs,
                     quant_config=quant_config.QuantConfig(pt2e_quantizer=quantizer),
                 )
-                with_quantizer.export("prompt_encoder_sparse_"+model_id+"_int8.tflite")
+                with_quantizer.export("prompt_encoder_"+model_id+"_int8.tflite")
 
                 edge_model = model
 

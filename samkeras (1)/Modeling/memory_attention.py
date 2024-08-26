@@ -2,8 +2,8 @@
 
 import tensorflow as tf
 from tensorflow.keras import layers
-from sam2keras.modeling.sam.transformer import RoPEAttention  
-from sam2keras.modeling.sam2_utils import get_activation_fn
+from sam2.modeling.sam.transformer import RoPEAttention  
+from sam2.modeling.sam2_utils import get_activation_fn
 
 class MemoryAttentionLayer(layers.Layer):
     def __init__(

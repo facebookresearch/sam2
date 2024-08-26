@@ -3,7 +3,7 @@
 import tensorflow as tf
 from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
-from .modeling.sam2_base import SAM2Base
+from sam2.modeling.sam2_base import SAM2Base
 
 class SAM2VideoPredictor(tf.keras.Model):
     def __init__(self, model: SAM2Base):

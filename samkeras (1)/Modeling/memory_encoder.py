@@ -2,7 +2,7 @@
 
 import tensorflow as tf
 from tensorflow.keras import layers
-from sam2keras.modeling.sam2_utils import DropPath, get_clones, LayerNorm2d
+from sam2.modeling.sam2_utils import DropPath, get_clones, LayerNorm2d
 
 class MaskDownSampler(layers.Layer):
     """

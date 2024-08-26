@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple, Type
 import tensorflow as tf
 from tensorflow.keras import layers
 
-from .modeling.sam2_utils import LayerNorm2d, MLP
+from sam2.modeling.sam2_utils import LayerNorm2d, MLP
 
 class MaskDecoder(layers.Layer):
     def __init__(

@@ -3,8 +3,8 @@
 import tensorflow as tf
 from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
-from .modeling.sam2_base import SAM2Base
-from .sam2_image_predictor import SAM2ImagePredictor
+from sam2.modeling.sam2_base import SAM2Base
+from sam2.sam2_image_predictor import SAM2ImagePredictor
 
 class AutomaticMaskGenerator(tf.keras.Model):
     def __init__(self, model: SAM2Base, points_per_side: Optional[int] = 32, points_per_batch: int = 64, pred_iou_thresh: float = 0.88, stability_score_thresh: float = 0.95, stability_score_offset: float = 1.0, box_nms_thresh: float = 0.7, crop_n_layers: int = 0, crop_nms_thresh: float = 0.7, mask_threshold: float = 0.0):

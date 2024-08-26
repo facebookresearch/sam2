@@ -4,6 +4,7 @@ import tensorflow as tf
 from tensorflow.keras import layers
 import numpy as np
 import math
+from typing import Optional, Tuple
 
 # --- RoPE-related functions --- 
 

@@ -1,22 +1,24 @@
 # /train.py
 
 import tensorflow as tf
-from .modeling.sam2_base import SAM2_Base
-from .modeling.backbones.image_encoder import ImageEncoder, FpnNeck
-from .modeling.backbones.hieradet import Hiera
-from .modeling.memory_attention import MemoryAttention, MemoryAttentionLayer
-from .modeling.memory_encoder import MemoryEncoder, MaskDownSampler, CXBlock, Fuser
-from .modeling.position_encoding import PositionEmbeddingSine
-from .modeling.sam.transformer import RoPEAttention, Attention, TwoWayTransformer
-from .modeling.sam.prompt_encoder import PromptEncoder
-from .modeling.sam.mask_decoder import MaskDecoder
-from .modeling.sam2_utils import LayerNorm2d, DropPath, MLP, get_1d_sine_pe, select_closest_cond_frames
+from sam2.modeling.sam2_base import SAM2Base
+from sam2.modeling.backbones.image_encoder import ImageEncoder, FpnNeck
+from sam2.modeling.backbones.hieradet import Hiera
+from sam2.modeling.memory_attention import MemoryAttention, MemoryAttentionLayer
+from sam2.modeling.memory_encoder import MemoryEncoder, MaskDownSampler, CXBlock, Fuser
+from sam2.modeling.position_encoding import PositionEmbeddingSine
+from sam2.modeling.sam.transformer import RoPEAttention, Attention, TwoWayTransformer
+from sam2.modeling.sam.prompt_encoder import PromptEncoder
+from sam2.modeling.sam.mask_decoder import MaskDecoder
+from sam2.modeling.sam2_utils import LayerNorm2d, DropPath, MLP, get_1d_sine_pe, select_closest_cond_frames
 import os
 import cv2
 import tarfile
 import numpy as np
 import subprocess
 from tqdm import tqdm  # Import tqdm for progress bars
+from tensorflow.keras import layers
+
 
 # --- 1. Configuration and Hyperparameters ---
 

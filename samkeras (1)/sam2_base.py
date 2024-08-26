@@ -45,6 +45,9 @@ def select_closest_cond_frames(frame_idx, cond_frame_outputs, max_cond_frame_num
 
 def get_1d_sine_pe(pos_inds, dim, temperature=10000):
     """
+from tensorflow.keras import layers
+from tensorflow.keras import layers
+from tensorflow.keras import layers
     Get 1D sine positional embedding as in the original Transformer paper.
     """
     pe_dim = dim // 2

@@ -3,12 +3,12 @@
 import tensorflow as tf
 from tensorflow.keras import layers
 import tensorflow.nn as nn 
-from .memory_attention import MemoryAttention
-from .memory_encoder import MemoryEncoder, MaskDownSampler
-from .sam.mask_decoder import MaskDecoder
-from .sam.prompt_encoder import PromptEncoder
-from .backbones.image_encoder import ImageEncoder
-from .backbones.hieradet import Hiera
+from sam2.memory_attention import MemoryAttention
+from sam2.memory_encoder import MemoryEncoder, MaskDownSampler
+from sam2.sam.mask_decoder import MaskDecoder
+from sam2.sam.prompt_encoder import PromptEncoder
+from sam2.backbones.image_encoder import ImageEncoder
+from sam2.backbones.hieradet import Hiera
 from .sam2_utils import get_1d_sine_pe, MLP, select_closest_cond_frames
 from .utils import LayerNorm2d 
 
@@ -517,7 +517,7 @@ class SAM2Base(tf.keras.Model):
             assert len(output_dict["cond_frame_outputs"]) > 0
             # Select a maximum number of temporally closest cond frames for cross attention
             
-                        cond_outputs = output_dict["cond_frame_outputs"]
+            cond_outputs = output_dict["cond_frame_outputs"]
             selected_cond_outputs, unselected_cond_outputs = select_closest_cond_frames(
                 frame_idx, cond_outputs, self.max_cond_frames_in_attn
             )

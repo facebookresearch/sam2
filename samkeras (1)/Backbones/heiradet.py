@@ -7,12 +7,12 @@ import tensorflow as tf
 from tensorflow.keras import layers
 import tensorflow.nn as nn 
 
-from .modeling.backbones.utils import (
+from sam2.modeling.backbones.utils import (
     PatchEmbed,
     window_partition,
     window_unpartition,
 )
-from .modeling.sam2_utils import DropPath, MLP
+from sam2.modeling.sam2_utils import DropPath, MLP
 
 def do_pool(x: tf.Tensor, pool: layers.Layer, norm: layers.Layer = None) -> tf.Tensor:
     if pool is None:

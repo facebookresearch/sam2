@@ -153,11 +153,12 @@ class PromptEncoder(nn.Module):
     def _get_device(self) -> torch.device:
         return self.point_embeddings[0].weight.device
 
-    def forward_normal(
+    def forward(
         self,
         coords: Optional[torch.Tensor],
         labels: Optional[torch.Tensor],
         masks: Optional[torch.Tensor],
+        masks_enable: Optional[torch.Tensor]
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Embeds different types of prompts, returning both sparse and dense
@@ -176,50 +177,22 @@ class PromptEncoder(nn.Module):
           torch.Tensor: dense embeddings for the masks, in the shape
             Bx(embed_dim)x(embed_H)x(embed_W)
         """
+        if coords is None or labels is None:
+            raise("onnx not supported coords is None")
+
         bs = self._get_batch_size(coords, labels, masks)
-        sparse_embeddings = torch.empty(
-            (bs, 0, self.embed_dim), device=self._get_device()
-        )
-        if coords is not None and labels is not None:
-            point_embeddings = self._embed_points(coords, labels, pad=True)
-            sparse_embeddings = torch.cat([sparse_embeddings, point_embeddings], dim=1)
-
-        if masks is not None:
-            dense_embeddings = self._embed_masks(masks)
-        else:
-            dense_embeddings = self.no_mask_embed.weight.reshape(1, -1, 1, 1).expand(
-                bs, -1, self.image_embedding_size[0], self.image_embedding_size[1]
-            )
-
-        return sparse_embeddings, dense_embeddings
-
-    def forward_sparse(
-        self,
-        coords: torch.Tensor,
-        labels: torch.Tensor,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        bs = coords.shape[0]
-        
         sparse_embeddings = torch.empty(
             (bs, 0, self.embed_dim), device=self._get_device()
         )
 
         point_embeddings = self._embed_points(coords, labels, pad=True)
         sparse_embeddings = torch.cat([sparse_embeddings, point_embeddings], dim=1)
-
-        dense_embeddings = self.no_mask_embed.weight.reshape(1, -1, 1, 1).expand(
+        
+        dense_embeddings1 = self.no_mask_embed.weight.reshape(1, -1, 1, 1).expand(
             bs, -1, self.image_embedding_size[0], self.image_embedding_size[1]
         )
+        dense_embeddings2 = self._embed_masks(masks)
+
+        dense_embeddings = torch.where(masks_enable[0] == 1, dense_embeddings2, dense_embeddings1)
 
         return sparse_embeddings, dense_embeddings, self.get_dense_pe()
-    
-    def forward_dense(
-        self,
-        masks: torch.Tensor,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        bs = masks.shape[0]
-        sparse_embeddings = torch.empty(
-            (bs, 0, self.embed_dim), device=self._get_device()
-        )
-        dense_embeddings = self._embed_masks(masks)
-        return sparse_embeddings, dense_embeddings

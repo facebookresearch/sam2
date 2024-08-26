@@ -493,25 +493,35 @@ class SAM2ImagePredictor:
             else:
                 concat_points = (box_coords, box_labels)
 
+        # New data for onnx
+        if concat_points is None:
+            raise ("concat points must be exists") # Noneの場合はtensorサイズが0のテンソルを返さないといけないためwhereで組めない
+        if mask_input is None:
+            mask_input_dummy = torch.Tensor(np.zeros((1, 256, 256)))
+            masks_enable = torch.tensor([0], dtype=torch.int) # boolだとonnxへのエクスポートのwhereでエラーになる
+        else:
+            mask_input_dummy = mask_input
+            masks_enable = torch.tensor([1], dtype=torch.int)
+        print("mask_input_dummy", mask_input_dummy.shape)
 
         if export_to_onnx:
             #print("concat_points", concat_points.shape)
             #print("mask_input", mask_input.shape)
-            self.model.sam_prompt_encoder.forward = self.model.sam_prompt_encoder.forward_sparse
             torch.onnx.export(
-                self.model.sam_prompt_encoder, (concat_points[0], concat_points[1]), 'prompt_encoder_sparse_'+model_id+'.onnx',
-                input_names=["coords", "labels"],
+                self.model.sam_prompt_encoder, (concat_points[0], concat_points[1], mask_input_dummy, masks_enable), 'prompt_encoder_'+model_id+'.onnx',
+                input_names=["coords", "labels", "masks", "masks_enable"],
                 output_names=["sparse_embeddings", "dense_embeddings", "dense_pe"],
                 dynamic_axes={
                     'coords': {0: 'b', 1: 'n'},
                     'labels': {0: 'b', 1: 'n'},
+                    'masks': {0: 'b', 1: 'h', 2: 'w'},
                 },
                 verbose=False, opset_version=17
             )
 
         if import_from_onnx:
-            model = onnxruntime.InferenceSession("prompt_encoder_sparse_"+model_id+".onnx")
-            sparse_embeddings, dense_embeddings, dense_pe = model.run(None, {"coords":concat_points[0].numpy(), "labels":concat_points[1].numpy()})
+            model = onnxruntime.InferenceSession("prompt_encoder_"+model_id+".onnx")
+            sparse_embeddings, dense_embeddings, dense_pe = model.run(None, {"coords":concat_points[0].numpy(), "labels":concat_points[1].numpy(), "masks": mask_input_dummy.numpy(), "masks_enable":masks_enable.numpy()})
             sparse_embeddings = torch.Tensor(sparse_embeddings)
             dense_embeddings = torch.Tensor(dense_embeddings)
             dense_pe = torch.Tensor(dense_pe)
@@ -531,8 +541,7 @@ class SAM2ImagePredictor:
 
         if export_to_tflite:
             import ai_edge_torch
-            sample_inputs = (concat_points[0], concat_points[1])
-            self.model.sam_prompt_encoder.forward = self.model.sam_prompt_encoder.forward_sparse
+            sample_inputs = (concat_points[0], concat_points[1], mask_input_dummy, masks_enable)
 
             if not tflite_int8:
                 edge_model = ai_edge_torch.convert(self.model.sam_prompt_encoder, sample_inputs)
@@ -561,17 +570,18 @@ class SAM2ImagePredictor:
                 edge_model = model
 
             if import_from_tflite and not tflite_int8:
-                sparse_embeddings, dense_embeddings, dense_pe = edge_model(concat_points[0], concat_points[1])
+                sparse_embeddings, dense_embeddings, dense_pe = edge_model(concat_points[0], concat_points[1], mask_input_dummy, masks_enable)
                 sparse_embeddings = torch.Tensor(sparse_embeddings)
                 dense_embeddings = torch.Tensor(dense_embeddings)
                 dense_pe = torch.Tensor(dense_pe)
 
         if not import_from_onnx and (not import_from_tflite or not export_to_tflite or tflite_int8):
-            sparse_embeddings, dense_embeddings = self.model.sam_prompt_encoder.forward_normal(
+            sparse_embeddings, dense_embeddings = self.model.sam_prompt_encoder.forward(
                 coords=concat_points[0],
                 labels=concat_points[1],
                 #boxes=None,
                 masks=mask_input,
+                masks_enable=masks_enable
             )
             dense_pe = self.model.sam_prompt_encoder.get_dense_pe()
 

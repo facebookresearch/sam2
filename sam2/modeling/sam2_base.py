@@ -340,8 +340,15 @@ class SAM2Base(torch.nn.Module):
                 raise("currently not supported mask prompt")
             import onnxruntime
             model_id = "hiera_l"
-            model = onnxruntime.InferenceSession("prompt_encoder_sparse_"+model_id+".onnx")
-            sparse_embeddings, dense_embeddings, dense_pe = model.run(None, {"coords":sam_point_coords.numpy(), "labels":sam_point_labels.numpy()})
+            model = onnxruntime.InferenceSession("prompt_encoder_"+model_id+".onnx")
+            if sam_mask_prompt is None:
+                import numpy as np
+                mask_input_dummy = torch.Tensor(np.zeros((1, 256, 256)))
+                masks_enable = torch.tensor([0], dtype=torch.int)
+            else:
+                mask_input_dummy = sam_mask_prompt
+                masks_enable = torch.tensor([1], dtype=torch.int)
+            sparse_embeddings, dense_embeddings, dense_pe = model.run(None, {"coords":sam_point_coords.numpy(), "labels":sam_point_labels.numpy(), "masks":mask_input_dummy.numpy(), "masks_enable":masks_enable.numpy()})
             sparse_embeddings = torch.Tensor(sparse_embeddings)
             dense_embeddings = torch.Tensor(dense_embeddings)
             dense_pe = torch.Tensor(dense_pe)

@@ -19,7 +19,7 @@ SAM 2 needs to be installed first before use. The code requires `python>=3.10`, 
 ```bash
 git clone https://github.com/facebookresearch/segment-anything-2.git
 
-cd segment-anything-2 & pip install -e .
+cd segment-anything-2 && pip install -e .
 ```
 If you are installing on Windows, it's strongly recommended to use [Windows Subsystem for Linux (WSL)](https://learn.microsoft.com/en-us/windows/wsl/install) with Ubuntu.
 

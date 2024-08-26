@@ -263,7 +263,12 @@ class MaskDecoder(nn.Module):
         assert (
             image_pe.shape[0] == 1
         ), "image_pe should have size 1 in batch dim (from `get_dense_pe()`)"
-        pos_src = torch.repeat_interleave(image_pe, tokens.shape[0], dim=0)
+        
+        pos_src = torch.tensor((tokens.shape[0], image_pe.shape[1], image_pe.shape[2]))
+        pos_src = image_pe # batch broad cast
+        
+        #pos_src = torch.repeat_interleave(image_pe, tokens.shape[0], dim=0) # one_hotが生成responseえる
+        
         b, c, h, w = src.shape
 
         # Run the transformer

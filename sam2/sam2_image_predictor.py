@@ -581,7 +581,7 @@ class SAM2ImagePredictor:
                 coords=concat_points[0],
                 labels=concat_points[1],
                 #boxes=None,
-                masks=mask_input,
+                masks=mask_input_dummy,
                 masks_enable=masks_enable
             )
             dense_pe = self.model.sam_prompt_encoder.get_dense_pe()
@@ -658,7 +658,6 @@ class SAM2ImagePredictor:
                 edge_model = model
 
             if import_from_tflite:
-                multimask_output_np = np.zeros((1), dtype=bool)
                 batched_mode_np = np.zeros((1), dtype=bool)
                 if batched_mode:
                     batched_mode_np[0] = True

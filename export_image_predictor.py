@@ -8,21 +8,40 @@ from sam2.build_sam import build_sam2
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 
 # export settings
-export_to_onnx_image_encoder = False
+export_to_onnx_image_encoder = True
 export_to_onnx_mask_decoder = True
+import_from_onnx = True
+
 export_to_tflite_image_encoder = False
 export_to_tflite_mask_decoder = False
-import_from_onnx = True
 import_from_tflite = False
+
 tflite_int8 = False
 show = True
 
 # export PJRT_DEVICE=CPU
 
 # model settings
-sam2_checkpoint = "./checkpoints/sam2_hiera_large.pt"
-model_cfg = "sam2_hiera_l.yaml"
-model_id = "hiera_l"
+#model_id = "hiera_l"
+model_id = "hiera_t"
+#model_id = "hiera_s"
+#model_id = "hiera_b+"
+
+if model_id == "hiera_l":
+    sam2_checkpoint = "./checkpoints/sam2_hiera_large.pt"
+    model_cfg = "sam2_hiera_l.yaml"
+if model_id == "hiera_b+":
+    sam2_checkpoint = "./checkpoints/sam2_hiera_base_plus.pt"
+    model_cfg = "sam2_hiera_b+.yaml"
+if model_id == "hiera_s":
+    sam2_checkpoint = "./checkpoints/sam2_hiera_small.pt"
+    model_cfg = "sam2_hiera_s.yaml"
+elif model_id == "hiera_t":
+    sam2_checkpoint = "./checkpoints/sam2_hiera_tiny.pt"
+    model_cfg = "sam2_hiera_t.yaml"
+else:
+    print("unknown model id")
+    exit()
 
 # use cpu for export
 device = torch.device("cpu")
@@ -57,7 +76,7 @@ def show_box(box, ax):
     w, h = box[2] - box[0], box[3] - box[1]
     ax.add_patch(plt.Rectangle((x0, y0), w, h, edgecolor='green', facecolor=(0, 0, 0, 0), lw=2))    
 
-def show_masks(image, masks, scores, point_coords=None, box_coords=None, input_labels=None, borders=True):
+def show_masks(image, masks, scores, point_coords=None, box_coords=None, input_labels=None, borders=True, model_id=model_id):
     for i, (mask, score) in enumerate(zip(masks, scores)):
         plt.figure(figsize=(10, 10))
         plt.imshow(image)
@@ -72,7 +91,7 @@ def show_masks(image, masks, scores, point_coords=None, box_coords=None, input_l
             plt.title(f"Mask {i+1}, Score: {score:.3f}", fontsize=18)
         plt.axis('off')
         #plt.show()
-        plt.savefig(f'output{i+1}.png')
+        plt.savefig(f'output{i+1}_'+model_id+'.png')
 
 # logic
 image = Image.open('notebooks/images/truck.jpg')
@@ -107,6 +126,6 @@ scores = scores[sorted_ind]
 logits = logits[sorted_ind]
 
 if show:
-    show_masks(image, masks, scores, point_coords=input_point, input_labels=input_label, borders=True)
+    show_masks(image, masks, scores, point_coords=input_point, input_labels=input_label, borders=True, model_id=model_id)
 
 print("Success!")

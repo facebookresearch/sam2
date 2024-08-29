@@ -22,18 +22,18 @@ show = True
 # export PJRT_DEVICE=CPU
 
 # model settings
-#model_id = "hiera_l"
-model_id = "hiera_t"
+model_id = "hiera_l"
+#model_id = "hiera_t"
 #model_id = "hiera_s"
 #model_id = "hiera_b+"
 
 if model_id == "hiera_l":
     sam2_checkpoint = "./checkpoints/sam2_hiera_large.pt"
     model_cfg = "sam2_hiera_l.yaml"
-if model_id == "hiera_b+":
+elif model_id == "hiera_b+":
     sam2_checkpoint = "./checkpoints/sam2_hiera_base_plus.pt"
     model_cfg = "sam2_hiera_b+.yaml"
-if model_id == "hiera_s":
+elif model_id == "hiera_s":
     sam2_checkpoint = "./checkpoints/sam2_hiera_small.pt"
     model_cfg = "sam2_hiera_s.yaml"
 elif model_id == "hiera_t":

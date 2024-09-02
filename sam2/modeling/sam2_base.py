@@ -224,6 +224,12 @@ class SAM2Base(torch.nn.Module):
         assert(self.sam_mask_decoder.dynamic_multimask_via_stability == True)
         assert(self.sam_mask_decoder.dynamic_multimask_stability_delta == 0.05)
         assert(self.sam_mask_decoder.dynamic_multimask_stability_thresh == 0.98)
+        assert(self.max_cond_frames_in_attn == -1)
+        assert(self.memory_temporal_stride_for_eval == 1)
+        assert(self.max_obj_ptrs_in_encoder == 16)
+        assert(self.only_obj_ptrs_in_the_past_for_eval == True)
+        assert(self.multimask_output_for_tracking == True)
+        assert(self.use_multimask_token_for_obj_ptr == True)
 
     @property
     def device(self):

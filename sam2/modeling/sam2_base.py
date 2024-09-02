@@ -116,11 +116,13 @@ class SAM2Base(torch.nn.Module):
         # with memories (and obj ptrs) from past frames
         self.memory_attention = memory_attention
         self.memory_attention_onnx_exported = False
+        self.memory_attention_tflite_exported = False
         self.hidden_dim = memory_attention.d_model
 
         # Part 3: memory encoder for the previous frame's outputs
         self.memory_encoder = memory_encoder
         self.memory_encoder_onnx_exported = False
+        self.memory_encoder_tflite_exported = False
         self.mem_dim = self.hidden_dim
         if hasattr(self.memory_encoder, "out_proj") and hasattr(
             self.memory_encoder.out_proj, "weight"
@@ -622,6 +624,8 @@ class SAM2Base(torch.nn.Module):
         track_in_reverse=False,  # tracking in reverse time order (for demo usage)
         export_to_onnx=False,
         import_from_onnx=False,
+        export_to_tflite=False,
+        import_from_tflite=False,
         model_id=None
     ):
         """Fuse the current frame's visual feature map with previous memory."""
@@ -799,7 +803,20 @@ class SAM2Base(torch.nn.Module):
             pix_feat_with_mem = model.run(None, {"curr":current_vision_feats[0].numpy(), "memory":memory.numpy(), "curr_pos":current_vision_pos_embeds[0].numpy(), "memory_pos":memory_pos_embed.numpy(), "num_obj_ptr_tokens":num_obj_ptr_tokens_numpy})
             pix_feat_with_mem = torch.Tensor(pix_feat_with_mem[0])
         
-        if not import_from_onnx:
+        if export_to_tflite and not self.memory_attention_tflite_exported:
+            self.memory_attention_tflite_exported = True
+            import ai_edge_torch
+            import tensorflow as tf
+            sample_inputs = (current_vision_feats[0], memory, current_vision_pos_embeds[0], memory_pos_embed, num_obj_ptr_tokens)
+            tfl_converter_flags = {'target_spec': {'supported_ops': [tf.lite.OpsSet.TFLITE_BUILTINS]}}
+            edge_model = ai_edge_torch.convert(self.memory_attention, sample_inputs, _ai_edge_converter_flags=tfl_converter_flags)
+            edge_model.export("memory_attention_"+model_id+".tflite")
+
+            if import_from_tflite:
+                pix_feat_with_mem = edge_model(sample_inputs)
+                pix_feat_with_mem = torch.Tensor(pix_feat_with_mem[0])
+
+        if not import_from_onnx and not import_from_tflite:
             pix_feat_with_mem = self.memory_attention(
                 curr=current_vision_feats,
                 curr_pos=current_vision_pos_embeds,
@@ -820,6 +837,8 @@ class SAM2Base(torch.nn.Module):
         is_mask_from_pts,
         export_to_onnx = False,
         import_from_onnx = False,
+        export_to_tflite = False,
+        import_from_tflite = False,
         model_id = None
     ):
         """Encode the current image and its prediction into a memory feature."""
@@ -863,7 +882,20 @@ class SAM2Base(torch.nn.Module):
             vision_features, vision_pos_enc = model.run(None, {"pix_feat":pix_feat.numpy(), "masks":mask_for_mem.numpy()})
             maskmem_out = {"vision_features": torch.Tensor(vision_features), "vision_pos_enc": [torch.Tensor(vision_pos_enc)]}
 
-        if not import_from_onnx:
+        if export_to_tflite and not self.memory_encoder_tflite_exported:
+            self.memory_encoder_tflite_exported = True
+            import ai_edge_torch
+            import tensorflow as tf
+            sample_inputs = (pix_feat, mask_for_mem, False)
+            tfl_converter_flags = {'target_spec': {'supported_ops': [tf.lite.OpsSet.TFLITE_BUILTINS]}}
+            edge_model = ai_edge_torch.convert(self.memory_encoder, sample_inputs, _ai_edge_converter_flags=tfl_converter_flags)
+            edge_model.export("memory_encoder"+model_id+".tflite")
+
+            if import_from_tflite:
+                vision_features, vision_pos_enc = edge_model(sample_inputs)
+                maskmem_out = {"vision_features": torch.Tensor(vision_features), "vision_pos_enc": [torch.Tensor(vision_pos_enc)]}
+
+        if not import_from_onnx and not import_from_tflite:
             maskmem_out = self.memory_encoder(
                 pix_feat, mask_for_mem, skip_mask_sigmoid=True  # sigmoid already applied
             )
@@ -930,6 +962,8 @@ class SAM2Base(torch.nn.Module):
                 track_in_reverse=track_in_reverse,
                 export_to_onnx=export_to_onnx,
                 import_from_onnx=import_from_onnx,
+                export_to_tflite=export_to_tflite,
+                import_from_tflite=import_from_tflite,
                 model_id=model_id
             )
             # apply SAM-style segmentation head
@@ -974,6 +1008,8 @@ class SAM2Base(torch.nn.Module):
                 is_mask_from_pts=(point_inputs is not None),
                 export_to_onnx=export_to_onnx,
                 import_from_onnx=import_from_onnx,
+                export_to_tflite=export_to_tflite,
+                import_from_tflite=import_from_tflite,
                 model_id=model_id
             )
             current_out["maskmem_features"] = maskmem_features

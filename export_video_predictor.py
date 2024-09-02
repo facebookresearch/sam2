@@ -81,7 +81,7 @@ frame_names = [
 ]
 frame_names.sort(key=lambda p: int(os.path.splitext(p)[0]))
 
-inference_state = predictor.init_state(video_path=video_dir, import_from_onnx=import_from_onnx)
+inference_state = predictor.init_state(video_path=video_dir, import_from_onnx=import_from_onnx, model_id=model_id)
 predictor.reset_state(inference_state)
 
 ann_frame_idx = 0  # the frame index we interact with

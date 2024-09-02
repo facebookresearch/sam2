@@ -43,7 +43,8 @@ class SAM2VideoPredictor(SAM2Base):
         offload_video_to_cpu=False,
         offload_state_to_cpu=False,
         async_loading_frames=False,
-        import_from_onnx=False
+        import_from_onnx=False,
+        model_id=None
     ):
         """Initialize an inference state."""
         compute_device = self.device  # device of the model
@@ -104,7 +105,7 @@ class SAM2VideoPredictor(SAM2Base):
         inference_state["tracking_has_started"] = False
         inference_state["frames_already_tracked"] = {}
         # Warm up the visual backbone and cache the image feature on frame 0
-        self._get_image_feature(inference_state, frame_idx=0, batch_size=1, import_from_onnx=import_from_onnx)
+        self._get_image_feature(inference_state, frame_idx=0, batch_size=1, import_from_onnx=import_from_onnx, model_id=model_id)
         return inference_state
 
     @classmethod
@@ -549,7 +550,8 @@ class SAM2VideoPredictor(SAM2Base):
                 batch_size=batch_size,
                 high_res_masks=high_res_masks,
                 is_mask_from_pts=True,  # these frames are what the user interacted with
-                import_from_onnx=import_from_onnx
+                import_from_onnx=import_from_onnx,
+                model_id=model_id
             )
             consolidated_out["maskmem_features"] = maskmem_features
             consolidated_out["maskmem_pos_enc"] = maskmem_pos_enc
@@ -573,7 +575,7 @@ class SAM2VideoPredictor(SAM2Base):
             current_vision_feats,
             current_vision_pos_embeds,
             feat_sizes,
-        ) = self._get_image_feature(inference_state, frame_idx, batch_size, import_from_onnx=import_from_onnx)
+        ) = self._get_image_feature(inference_state, frame_idx, batch_size, import_from_onnx=import_from_onnx, model_id=model_id)
 
         # Feed the empty mask and image feature above to get a dummy object pointer
         current_out = self.track_step(
@@ -816,7 +818,7 @@ class SAM2VideoPredictor(SAM2Base):
         inference_state["tracking_has_started"] = False
         inference_state["frames_already_tracked"].clear()
 
-    def _get_image_feature(self, inference_state, frame_idx, batch_size, import_from_onnx = False):
+    def _get_image_feature(self, inference_state, frame_idx, batch_size, import_from_onnx = False, model_id = None):
         """Compute the image features on a given frame."""
         # Look up in the cache first
         image, backbone_out = inference_state["cached_features"].get(
@@ -830,7 +832,6 @@ class SAM2VideoPredictor(SAM2Base):
                 print("begin image encoder onnx")
                 print(image.shape)
                 import onnxruntime
-                model_id = "hiera_l"
                 model = onnxruntime.InferenceSession("model/image_encoder_"+model_id+".onnx")
                 vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = model.run(None, {"input_image":image.numpy()})
             else:
@@ -889,7 +890,7 @@ class SAM2VideoPredictor(SAM2Base):
             current_vision_feats,
             current_vision_pos_embeds,
             feat_sizes,
-        ) = self._get_image_feature(inference_state, frame_idx, batch_size, import_from_onnx=import_from_onnx)
+        ) = self._get_image_feature(inference_state, frame_idx, batch_size, import_from_onnx=import_from_onnx, model_id=model_id)
 
         # point and mask should not appear as input simultaneously on the same frame
         assert point_inputs is None or mask_inputs is None
@@ -938,7 +939,7 @@ class SAM2VideoPredictor(SAM2Base):
         return compact_current_out, pred_masks_gpu
 
     def _run_memory_encoder(
-        self, inference_state, frame_idx, batch_size, high_res_masks, is_mask_from_pts, import_from_onnx
+        self, inference_state, frame_idx, batch_size, high_res_masks, is_mask_from_pts, import_from_onnx, model_id
     ):
         """
         Run the memory encoder on `high_res_masks`. This is usually after applying
@@ -947,7 +948,7 @@ class SAM2VideoPredictor(SAM2Base):
         """
         # Retrieve correct image features
         _, _, current_vision_feats, _, feat_sizes = self._get_image_feature(
-            inference_state, frame_idx, batch_size, import_from_onnx=import_from_onnx
+            inference_state, frame_idx, batch_size, import_from_onnx=import_from_onnx, model_id=model_id
         )
         maskmem_features, maskmem_pos_enc = self._encode_new_memory(
             current_vision_feats=current_vision_feats,

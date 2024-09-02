@@ -194,6 +194,37 @@ class SAM2Base(torch.nn.Module):
                 dynamic=False,
             )
 
+        # Check decoder sample parameter
+        assert(self.image_size == 1024)
+        assert(self.num_feature_levels == 3)
+        assert(self.hidden_dim == 256)
+        assert(self.num_maskmem == 7)
+        assert(self.directly_add_no_mem_embed == True)
+        #assert(self.training == False)
+        assert(self.mem_dim == 64)
+        assert(self.add_tpos_enc_to_obj_ptrs == False)
+        assert(self.use_obj_ptrs_in_encoder == True)
+        assert(self.add_all_frames_to_correct_as_cond == False)
+        assert(self.multimask_output_in_sam == True)
+        assert(self.multimask_min_pt_num == 0)
+        assert(self.multimask_max_pt_num == 1)
+        assert(self.sam_prompt_embed_dim == self.hidden_dim)
+        assert(self.backbone_stride == 16)
+        assert(self.sam_image_embedding_size == self.image_size // self.backbone_stride)
+        assert(self.pred_obj_scores == True)
+        assert(self.use_obj_ptrs_in_encoder == True)
+        assert(self.use_mlp_for_obj_ptr_proj == True)
+        assert(self.proj_tpos_enc_in_obj_ptrs == False)
+        assert(self.soft_no_obj_ptr == False)
+        assert(self.fixed_no_obj_ptr == True)
+        assert(self.non_overlap_masks_for_mem_enc == False)
+        assert(self.binarize_mask_from_pts_for_mem_enc == False or self.binarize_mask_from_pts_for_mem_enc == True) # True for video
+        assert(self.sigmoid_scale_for_mem_enc == 20)
+        assert(self.sigmoid_bias_for_mem_enc == -10.0)
+        assert(self.sam_mask_decoder.dynamic_multimask_via_stability == True)
+        assert(self.sam_mask_decoder.dynamic_multimask_stability_delta == 0.05)
+        assert(self.sam_mask_decoder.dynamic_multimask_stability_thresh == 0.98)
+
     @property
     def device(self):
         return next(self.parameters()).device

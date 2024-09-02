@@ -30,15 +30,15 @@ ai-edge-torch 0.2.0
 onnx
 
 ```
-python3 export_image_predictor.py -framework onnx
-python3 export_video_predictor.py -framework onnx
+python3 export_image_predictor.py --framework onnx
+python3 export_video_predictor.py --framework onnx
 ```
 
 tflite
 
 ```
-python3 export_image_predictor.py -framework tflite
-python3 export_video_predictor.py -framework tflite
+python3 export_image_predictor.py --framework tflite
+python3 export_video_predictor.py --framework tflite
 ```
 
 ## Artifacts

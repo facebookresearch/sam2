@@ -3,9 +3,9 @@
 
 import argparse
 parser = argparse.ArgumentParser()
-parser.add_argument('-model_id', default="hiera_t", choices=["hiera_l", "hiera_b+", "hiera_s", "hiera_t"])
-parser.add_argument('-framework', default="onnx", choices=["onnx", "tflite"])
-parser.add_argument('-accuracy', default="float", choices=["float", "int8"])
+parser.add_argument('--model_id', default="hiera_t", choices=["hiera_l", "hiera_b+", "hiera_s", "hiera_t"])
+parser.add_argument('--framework', default="onnx", choices=["onnx", "tflite"])
+parser.add_argument('--accuracy', default="float", choices=["float", "int8"])
 args = parser.parse_args()
 
 import os

@@ -706,7 +706,7 @@ class SAM2Base(torch.nn.Module):
         memory = torch.cat(to_cat_memory, dim=0)
         memory_pos_embed = torch.cat(to_cat_memory_pos_embed, dim=0)
 
-        if False:#export_to_onnx and not self.memory_attention_onnx_exported:
+        if export_to_onnx and not self.memory_attention_onnx_exported:
             self.memory_attention_onnx_exported = True
             print("current_vision_feats", current_vision_feats[0].shape, current_vision_feats[0].dtype)
             print("memory", memory.shape, memory.dtype)
@@ -720,12 +720,12 @@ class SAM2Base(torch.nn.Module):
                 verbose=False, opset_version=17
             )
 
-        if False:#import_from_onnx:
+        if import_from_onnx:
             import onnxruntime
             model = onnxruntime.InferenceSession("model/memory_attention_"+model_id+".onnx")
             pix_feat_with_mem = model.run(None, {"curr":current_vision_feats[0].numpy(), "memory":memory.numpy(), "curr_pos":current_vision_pos_embeds[0].numpy(), "memory_pos":memory_pos_embed.numpy(), "num_obj_ptr_tokens":num_obj_ptr_tokens.numpy()})
         
-        if True:#not import_from_onnx:
+        if not import_from_onnx:
             pix_feat_with_mem = self.memory_attention(
                 curr=current_vision_feats,
                 curr_pos=current_vision_pos_embeds,

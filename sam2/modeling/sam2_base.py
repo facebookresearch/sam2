@@ -193,6 +193,12 @@ class SAM2Base(torch.nn.Module):
                 fullgraph=True,
                 dynamic=False,
             )
+        
+        # onnx
+        self.image_encoder_onnx = False
+        self.prompt_encoder_onnx = False
+        self.mask_decoder_onnx = False
+        self.mlp_onnx = None
 
         # Check decoder sample parameter
         assert(self.image_size == 1024)
@@ -392,15 +398,17 @@ class SAM2Base(torch.nn.Module):
             if sam_mask_prompt != None:
                 raise("currently not supported mask prompt")
             import onnxruntime
-            model = onnxruntime.InferenceSession("model/prompt_encoder_"+model_id+".onnx")
-            sparse_embeddings, dense_embeddings, dense_pe = model.run(None, {"coords":sam_point_coords.numpy(), "labels":sam_point_labels.numpy(), "masks":mask_input_dummy.numpy(), "masks_enable":masks_enable.numpy()})
+            if self.image_encoder_onnx == None:
+                self.image_encoder_onnx = onnxruntime.InferenceSession("model/prompt_encoder_"+model_id+".onnx")
+            sparse_embeddings, dense_embeddings, dense_pe = self.image_encoder_onnx.run(None, {"coords":sam_point_coords.numpy(), "labels":sam_point_labels.numpy(), "masks":mask_input_dummy.numpy(), "masks_enable":masks_enable.numpy()})
             sparse_embeddings = torch.Tensor(sparse_embeddings)
             dense_embeddings = torch.Tensor(dense_embeddings)
             dense_pe = torch.Tensor(dense_pe)
 
-            model = onnxruntime.InferenceSession("model/mask_decoder_"+model_id+".onnx")
+            if self.mask_decoder_onnx == None:
+                self.mask_decoder_onnx  = onnxruntime.InferenceSession("model/mask_decoder_"+model_id+".onnx")
             print("backbone_features", backbone_features.shape)
-            masks, iou_pred, sam_tokens_out, object_score_logits  = model.run(None, {
+            masks, iou_pred, sam_tokens_out, object_score_logits  = self.mask_decoder_onnx.run(None, {
                 "image_embeddings":backbone_features.numpy(),
                 "image_pe": dense_pe.numpy(),
                 "sparse_prompt_embeddings": sparse_embeddings.numpy(),
@@ -560,9 +568,10 @@ class SAM2Base(torch.nn.Module):
 
         if import_from_onnx:
             import onnxruntime
-            model = onnxruntime.InferenceSession("model/mlp_"+model_id+".onnx")
+            if self.mlp_onnx == None:
+                self.mlp_onnx  = onnxruntime.InferenceSession("model/mlp_"+model_id+".onnx")
             import numpy as np
-            obj_ptr = model.run(None, {"x":sam_output_token.numpy()})[0]
+            obj_ptr = self.mlp_onnx.run(None, {"x":sam_output_token.numpy()})[0]
             obj_ptr = torch.Tensor(obj_ptr)
         
         if not import_from_onnx:

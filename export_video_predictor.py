@@ -1,8 +1,36 @@
-﻿import os
+﻿# Export memory attention and memory encoder
+# Implemented by ax Inc. 2024
+
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument('model_id', default="hiera_t", choices=["hiera_l", "hiera_b+", "hiera_s", "hiera_t"])
+parser.add_argument('framework', default="onnx", choices=["onnx", "tflite"])
+parser.add_argument('accuracy', default="float", choices=["float", "int8"])
+args = parser.parse_args()
+
+import os
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from PIL import Image
+
+# output
+os.makedirs("output", exist_ok=True)
+os.makedirs("model", exist_ok=True)
+
+# export settings
+model_id = args.model_id
+
+export_to_onnx = args.framework=="onnx"
+import_from_onnx = args.framework=="onnx"
+
+# import
+if model_id == "hiera_l":
+   model_cfg = "sam2_hiera_l.yaml"
+elif model_id == "hiera_t":
+    model_cfg = "sam2_hiera_t.yaml"
+else:
+    raise("unknown model type")
 
 device = torch.device("cpu")
 print(f"using device: {device}")
@@ -10,11 +38,6 @@ print(f"using device: {device}")
 from sam2.build_sam import build_sam2_video_predictor
 
 sam2_checkpoint = "./checkpoints/sam2_hiera_large.pt"
-model_cfg = "sam2_hiera_l.yaml"
-
-export_to_onnx = True
-model_id = "hiera_l"
-import_from_onnx = True
 
 predictor = build_sam2_video_predictor(model_cfg, sam2_checkpoint, device=device)
 

@@ -1,4 +1,14 @@
-﻿import os
+﻿# Export image encoder and prompt encoder and mask decoder
+# Implemented by ax Inc. 2024
+
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument('-model_id', default="hiera_t", choices=["hiera_l", "hiera_b+", "hiera_s", "hiera_t"])
+parser.add_argument('-framework', default="onnx", choices=["onnx", "tflite"])
+parser.add_argument('-accuracy', default="float", choices=["float", "int8"])
+args = parser.parse_args()
+
+import os
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
@@ -7,26 +17,25 @@ from PIL import Image
 from sam2.build_sam import build_sam2
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 
+# output
+os.makedirs("output", exist_ok=True)
+os.makedirs("model", exist_ok=True)
+
 # export settings
-export_to_onnx_image_encoder = True
-export_to_onnx_mask_decoder = True
-import_from_onnx = True
+export_to_onnx_image_encoder = args.framework == "onnx"
+export_to_onnx_mask_decoder = args.framework == "onnx"
+import_from_onnx = args.framework == "onnx"
 
-export_to_tflite_image_encoder = False
-export_to_tflite_mask_decoder = False
-import_from_tflite = False
+export_to_tflite_image_encoder = args.framework == "tflite"
+export_to_tflite_mask_decoder = args.framework == "tflite"
+import_from_tflite = args.framework == "tflite"
 
-tflite_int8 = False
-show = True
+tflite_int8 = args.accuracy == "int8"
 
 # export PJRT_DEVICE=CPU
 
 # model settings
-model_id = "hiera_l"
-#model_id = "hiera_t"
-#model_id = "hiera_s"
-#model_id = "hiera_b+"
-
+model_id = args.model_id
 if model_id == "hiera_l":
     sam2_checkpoint = "./checkpoints/sam2_hiera_large.pt"
     model_cfg = "sam2_hiera_l.yaml"
@@ -91,7 +100,7 @@ def show_masks(image, masks, scores, point_coords=None, box_coords=None, input_l
             plt.title(f"Mask {i+1}, Score: {score:.3f}", fontsize=18)
         plt.axis('off')
         #plt.show()
-        plt.savefig(f'output{i+1}_'+model_id+'.png')
+        plt.savefig(f'output/output{i+1}_'+model_id+'.png')
 
 # logic
 image = Image.open('notebooks/images/truck.jpg')
@@ -125,7 +134,6 @@ masks = masks[sorted_ind]
 scores = scores[sorted_ind]
 logits = logits[sorted_ind]
 
-if show:
-    show_masks(image, masks, scores, point_coords=input_point, input_labels=input_label, borders=True, model_id=model_id)
+show_masks(image, masks, scores, point_coords=input_point, input_labels=input_label, borders=True, model_id=model_id)
 
 print("Success!")

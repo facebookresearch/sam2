@@ -831,7 +831,7 @@ class SAM2VideoPredictor(SAM2Base):
                 print(image.shape)
                 import onnxruntime
                 model_id = "hiera_l"
-                model = onnxruntime.InferenceSession("image_encoder_"+model_id+".onnx")
+                model = onnxruntime.InferenceSession("model/image_encoder_"+model_id+".onnx")
                 vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = model.run(None, {"input_image":image.numpy()})
             else:
                 print("begin image encoder torch")

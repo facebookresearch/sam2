@@ -127,14 +127,14 @@ class SAM2ImagePredictor:
             #print("input_image", input_image.shape)
             self.model.forward = self.model.forward_image
             torch.onnx.export(
-                self.model, (input_image), 'image_encoder_'+model_id+'.onnx',
+                self.model, (input_image), 'model/image_encoder_'+model_id+'.onnx',
                 input_names=["input_image"],
                 output_names=["vision_features", "vision_pos_enc_0", "vision_pos_enc_1", "vision_pos_enc_2", "backbone_fpn_0", "backbone_fpn_1", "backbone_fpn_2"],
                 verbose=False, opset_version=17
             )
         
         if import_from_onnx:
-            model = onnxruntime.InferenceSession("image_encoder_"+model_id+".onnx")
+            model = onnxruntime.InferenceSession("model/image_encoder_"+model_id+".onnx")
             vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = model.run(None, {"input_image":input_image.numpy()})
             print("vision_features", vision_features.shape)
             print("vision_pos_enc_0", vision_pos_enc_0.shape)
@@ -509,7 +509,7 @@ class SAM2ImagePredictor:
             #print("concat_points", concat_points.shape)
             #print("mask_input", mask_input.shape)
             torch.onnx.export(
-                self.model.sam_prompt_encoder, (concat_points[0], concat_points[1], mask_input_dummy, masks_enable), 'prompt_encoder_'+model_id+'.onnx',
+                self.model.sam_prompt_encoder, (concat_points[0], concat_points[1], mask_input_dummy, masks_enable), 'model/prompt_encoder_'+model_id+'.onnx',
                 input_names=["coords", "labels", "masks", "masks_enable"],
                 output_names=["sparse_embeddings", "dense_embeddings", "dense_pe"],
                 dynamic_axes={
@@ -521,7 +521,7 @@ class SAM2ImagePredictor:
             )
 
         if import_from_onnx:
-            model = onnxruntime.InferenceSession("prompt_encoder_"+model_id+".onnx")
+            model = onnxruntime.InferenceSession("model/prompt_encoder_"+model_id+".onnx")
             sparse_embeddings, dense_embeddings, dense_pe = model.run(None, {"coords":concat_points[0].numpy(), "labels":concat_points[1].numpy(), "masks": mask_input_dummy.numpy(), "masks_enable":masks_enable.numpy()})
             sparse_embeddings = torch.Tensor(sparse_embeddings)
             dense_embeddings = torch.Tensor(dense_embeddings)
@@ -588,7 +588,7 @@ class SAM2ImagePredictor:
             self.model.sam_mask_decoder.forward = self.model.sam_mask_decoder.forward_masks # multimask_outputが定数になってしまうので分離
             torch.onnx.export(
                 self.model.sam_mask_decoder, (self._features["image_embed"][img_idx].unsqueeze(0), dense_pe, sparse_embeddings, dense_embeddings, batched_mode, high_res_features[0], high_res_features[1]),
-                'mask_decoder_'+model_id+'.onnx',
+                'model/mask_decoder_'+model_id+'.onnx',
                 input_names=["image_embeddings", "image_pe", "sparse_prompt_embeddings", "dense_prompt_embeddings", "repeat_image", "high_res_features1", "high_res_features2"],
                 output_names=["masks", "iou_pred", "sam_tokens_out", "object_score_logits"],
                 dynamic_axes={
@@ -598,7 +598,7 @@ class SAM2ImagePredictor:
             )
         
         if import_from_onnx:
-            model = onnxruntime.InferenceSession("mask_decoder_"+model_id+".onnx")
+            model = onnxruntime.InferenceSession("model/mask_decoder_"+model_id+".onnx")
             masks, iou_pred, sam_tokens_out, object_score_logits = model.run(None, {
                 "image_embeddings":self._features["image_embed"][img_idx].unsqueeze(0).numpy(),
                 "image_pe": dense_pe.numpy(),

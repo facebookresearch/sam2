@@ -340,7 +340,7 @@ class SAM2Base(torch.nn.Module):
                 raise("currently not supported mask prompt")
             import onnxruntime
             model_id = "hiera_l"
-            model = onnxruntime.InferenceSession("prompt_encoder_"+model_id+".onnx")
+            model = onnxruntime.InferenceSession("model/prompt_encoder_"+model_id+".onnx")
             if sam_mask_prompt is None:
                 import numpy as np
                 mask_input_dummy = torch.Tensor(np.zeros((1, 256, 256)))
@@ -353,7 +353,7 @@ class SAM2Base(torch.nn.Module):
             dense_embeddings = torch.Tensor(dense_embeddings)
             dense_pe = torch.Tensor(dense_pe)
 
-            model = onnxruntime.InferenceSession("mask_decoder_"+model_id+".onnx")
+            model = onnxruntime.InferenceSession("model/mask_decoder_"+model_id+".onnx")
             print("backbone_features", backbone_features.shape)
             masks, iou_pred, sam_tokens_out, object_score_logits  = model.run(None, {
                 "image_embeddings":backbone_features.numpy(),
@@ -714,7 +714,7 @@ class SAM2Base(torch.nn.Module):
             print("memory_pos_embed", memory_pos_embed.shape, memory_pos_embed.dtype)
             print("num_obj_ptr_tokens", num_obj_ptr_tokens)
             torch.onnx.export( # dynamo_export
-                self.memory_attention, (current_vision_feats[0], memory, current_vision_pos_embeds[0], memory_pos_embed, num_obj_ptr_tokens), 'memory_attention_'+model_id+'.onnx',
+                self.memory_attention, (current_vision_feats[0], memory, current_vision_pos_embeds[0], memory_pos_embed, num_obj_ptr_tokens), 'model/memory_attention_'+model_id+'.onnx',
                 input_names=["curr", "memory", "curr_pos", "memory_pos", "num_obj_ptr_tokens"],
                 output_names=["pix_feat"],
                 verbose=False, opset_version=17
@@ -722,7 +722,7 @@ class SAM2Base(torch.nn.Module):
 
         if False:#import_from_onnx:
             import onnxruntime
-            model = onnxruntime.InferenceSession("memory_attention_"+model_id+".onnx")
+            model = onnxruntime.InferenceSession("model/memory_attention_"+model_id+".onnx")
             pix_feat_with_mem = model.run(None, {"curr":current_vision_feats[0].numpy(), "memory":memory.numpy(), "curr_pos":current_vision_pos_embeds[0].numpy(), "memory_pos":memory_pos_embed.numpy(), "num_obj_ptr_tokens":num_obj_ptr_tokens.numpy()})
         
         if True:#not import_from_onnx:
@@ -777,7 +777,7 @@ class SAM2Base(torch.nn.Module):
         if export_to_onnx and not self.memory_encoder_onnx_exported:
             self.memory_encoder_onnx_exported = True
             torch.onnx.export(
-                self.memory_encoder, (pix_feat, mask_for_mem, False), 'memory_encoder_'+model_id+'.onnx',
+                self.memory_encoder, (pix_feat, mask_for_mem, False), 'model/memory_encoder_'+model_id+'.onnx',
                 input_names=["pix_feat", "masks"],
                 output_names=["vision_features", "vision_pos_enc"],
                 verbose=False, opset_version=17
@@ -785,7 +785,7 @@ class SAM2Base(torch.nn.Module):
 
         if import_from_onnx:
             import onnxruntime
-            model = onnxruntime.InferenceSession("memory_encoder_"+model_id+".onnx")
+            model = onnxruntime.InferenceSession("model/memory_encoder_"+model_id+".onnx")
             vision_features, vision_pos_enc = model.run(None, {"pix_feat":pix_feat.numpy(), "masks":mask_for_mem.numpy()})
             maskmem_out = {"vision_features": torch.Tensor(vision_features), "vision_pos_enc": [torch.Tensor(vision_pos_enc)]}
 

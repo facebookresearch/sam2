@@ -717,13 +717,20 @@ class SAM2Base(torch.nn.Module):
                 self.memory_attention, (current_vision_feats[0], memory, current_vision_pos_embeds[0], memory_pos_embed, num_obj_ptr_tokens), 'model/memory_attention_'+model_id+'.onnx',
                 input_names=["curr", "memory", "curr_pos", "memory_pos", "num_obj_ptr_tokens"],
                 output_names=["pix_feat"],
+                dynamic_axes={
+                    'memory': {0: 'n'},
+                    'memory_pos': {0: 'n'}
+                },
                 verbose=False, opset_version=17
             )
 
         if import_from_onnx:
             import onnxruntime
             model = onnxruntime.InferenceSession("model/memory_attention_"+model_id+".onnx")
-            pix_feat_with_mem = model.run(None, {"curr":current_vision_feats[0].numpy(), "memory":memory.numpy(), "curr_pos":current_vision_pos_embeds[0].numpy(), "memory_pos":memory_pos_embed.numpy(), "num_obj_ptr_tokens":num_obj_ptr_tokens})
+            import numpy as np
+            num_obj_ptr_tokens_numpy = np.array((num_obj_ptr_tokens)).astype(np.int64)
+            pix_feat_with_mem = model.run(None, {"curr":current_vision_feats[0].numpy(), "memory":memory.numpy(), "curr_pos":current_vision_pos_embeds[0].numpy(), "memory_pos":memory_pos_embed.numpy(), "num_obj_ptr_tokens":num_obj_ptr_tokens_numpy})
+            pix_feat_with_mem = torch.Tensor(pix_feat_with_mem[0])
         
         if not import_from_onnx:
             pix_feat_with_mem = self.memory_attention(

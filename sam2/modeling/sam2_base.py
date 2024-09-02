@@ -179,6 +179,8 @@ class SAM2Base(torch.nn.Module):
         self.add_all_frames_to_correct_as_cond = add_all_frames_to_correct_as_cond
         self.max_cond_frames_in_attn = max_cond_frames_in_attn
 
+        self.mlp_onnx_exported = False
+
         # Model compilation
         if compile_image_encoder:
             # Compile the forward function (not the full module) to allow loading checkpoints.
@@ -259,7 +261,9 @@ class SAM2Base(torch.nn.Module):
         mask_inputs=None,
         high_res_features=None,
         multimask_output=False,
+        export_to_onnx=False,
         import_from_onnx=False,
+        export_to_tflite=False,
         import_from_tflite=False,
         model_id=None
     ):
@@ -503,7 +507,30 @@ class SAM2Base(torch.nn.Module):
             low_res_masks, high_res_masks = low_res_multimasks, high_res_multimasks
 
         # Extract object pointer from the SAM output token (with occlusion handling)
-        obj_ptr = self.obj_ptr_proj(sam_output_token)
+        if export_to_onnx and not self.mlp_onnx_exported:
+            print("x", sam_output_token.shape)
+            self.mlp_onnx_exported = True
+            torch.onnx.export(
+                self.obj_ptr_proj, (sam_output_token), 'model/mlp_'+model_id+'.onnx',
+                input_names=["x"],
+                output_names=["x_out"],
+                dynamic_axes={
+                    'x': {0: 'n'},
+                    'obj_ptr': {0: 'n'}
+                },
+                verbose=False, opset_version=17
+            )
+
+        if import_from_onnx:
+            import onnxruntime
+            model = onnxruntime.InferenceSession("model/mlp_"+model_id+".onnx")
+            import numpy as np
+            obj_ptr = model.run(None, {"x":sam_output_token.numpy()})[0]
+            obj_ptr = torch.Tensor(obj_ptr)
+        
+        if not import_from_onnx:
+            obj_ptr = self.obj_ptr_proj(sam_output_token)
+
         if self.pred_obj_scores:
             # Allow *soft* no obj ptr, unlike for masks
             if self.soft_no_obj_ptr:
@@ -527,7 +554,7 @@ class SAM2Base(torch.nn.Module):
             object_score_logits,
         )
 
-    def _use_mask_as_output(self, backbone_features, high_res_features, mask_inputs, import_from_onnx, import_from_tflite, model_id):
+    def _use_mask_as_output(self, backbone_features, high_res_features, mask_inputs, export_to_onnx, import_from_onnx, export_to_tflite, import_from_tflite, model_id):
         """
         Directly turn binary `mask_inputs` into a output mask logits without using SAM.
         (same input and output shapes as in _forward_sam_heads above).
@@ -556,7 +583,9 @@ class SAM2Base(torch.nn.Module):
                 backbone_features=backbone_features,
                 mask_inputs=self.mask_downsample(mask_inputs_float),
                 high_res_features=high_res_features,
+                export_to_onnx=export_to_onnx,
                 import_from_onnx=import_from_onnx,
+                export_to_tflite=export_to_tflite,
                 import_from_tflite=import_from_tflite,
                 model_id=model_id
             )
@@ -947,7 +976,8 @@ class SAM2Base(torch.nn.Module):
             pix_feat = current_vision_feats[-1].permute(1, 2, 0)
             pix_feat = pix_feat.view(-1, self.hidden_dim, *feat_sizes[-1])
             sam_outputs = self._use_mask_as_output(
-                pix_feat, high_res_features, mask_inputs, import_from_onnx=import_from_onnx, import_from_tflite=import_from_tflite, model_id=model_id
+                pix_feat, high_res_features, mask_inputs,
+                export_to_onnx=export_to_onnx, import_from_onnx=import_from_onnx, export_to_tflite=export_to_tflite, import_from_tflite=import_from_tflite, model_id=model_id
             )
         else:
             # fused the visual feature with previous memory features in the memory bank
@@ -980,7 +1010,10 @@ class SAM2Base(torch.nn.Module):
                 mask_inputs=mask_inputs,
                 high_res_features=high_res_features,
                 multimask_output=multimask_output,
+                export_to_onnx=export_to_onnx,
                 import_from_onnx=import_from_onnx,
+                export_to_tflite=export_to_tflite,
+                import_from_tflite=import_from_tflite,
                 model_id=model_id
             )
         (

@@ -35,7 +35,7 @@ elif model_id == "hiera_s":
     sam2_checkpoint = "./checkpoints/sam2_hiera_small.pt"
 elif model_id == "hiera_b+":
     model_cfg = "sam2_hiera_b+.yaml"
-    sam2_checkpoint = "./checkpoints/sam2_hiera_base+.pt"
+    sam2_checkpoint = "./checkpoints/sam2_hiera_base_plus.pt"
 elif model_id == "hiera_t":
     model_cfg = "sam2_hiera_t.yaml"
     sam2_checkpoint = "./checkpoints/sam2_hiera_tiny.pt"

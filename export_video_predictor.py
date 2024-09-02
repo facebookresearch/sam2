@@ -23,6 +23,8 @@ model_id = args.model_id
 
 export_to_onnx = args.framework=="onnx"
 import_from_onnx = args.framework=="onnx"
+export_to_tflite = args.framework=="tflite"
+import_from_tflite = args.framework=="tflite"
 
 # import
 if model_id == "hiera_l":
@@ -81,7 +83,7 @@ frame_names = [
 ]
 frame_names.sort(key=lambda p: int(os.path.splitext(p)[0]))
 
-inference_state = predictor.init_state(video_path=video_dir, import_from_onnx=import_from_onnx, model_id=model_id)
+inference_state = predictor.init_state(video_path=video_dir, import_from_onnx=import_from_onnx, import_from_tflite=import_from_tflite, model_id=model_id)
 predictor.reset_state(inference_state)
 
 ann_frame_idx = 0  # the frame index we interact with
@@ -114,7 +116,7 @@ plt.savefig(f'output/video_'+model_id+'.png')
 
 # run propagation throughout the video and collect the results in a dict
 video_segments = {}  # video_segments contains the per-frame segmentation results
-for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(inference_state, import_from_onnx=import_from_onnx, export_to_onnx=export_to_onnx, model_id=model_id):
+for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(inference_state, import_from_onnx=import_from_onnx, export_to_onnx=export_to_onnx, import_from_tflite=import_from_tflite, export_to_tflite=export_to_tflite, model_id=model_id):
     video_segments[out_frame_idx] = {
         out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
         for i, out_obj_id in enumerate(out_obj_ids)

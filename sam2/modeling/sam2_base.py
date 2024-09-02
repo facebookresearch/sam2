@@ -258,6 +258,7 @@ class SAM2Base(torch.nn.Module):
         high_res_features=None,
         multimask_output=False,
         import_from_onnx=False,
+        import_from_tflite=False,
         model_id=None
     ):
         """
@@ -335,19 +336,20 @@ class SAM2Base(torch.nn.Module):
             # a learned `no_mask_embed` to indicate no mask input in this case).
             sam_mask_prompt = None
 
+        if sam_mask_prompt is None:
+            import numpy as np
+            mask_input_dummy = torch.Tensor(np.zeros((1, 256, 256)))
+            masks_enable = torch.tensor([0], dtype=torch.int)
+        else:
+            mask_input_dummy = sam_mask_prompt
+            masks_enable = torch.tensor([1], dtype=torch.int)
+
         if import_from_onnx:
             print("begin mask decoder onnx")
             if sam_mask_prompt != None:
                 raise("currently not supported mask prompt")
             import onnxruntime
             model = onnxruntime.InferenceSession("model/prompt_encoder_"+model_id+".onnx")
-            if sam_mask_prompt is None:
-                import numpy as np
-                mask_input_dummy = torch.Tensor(np.zeros((1, 256, 256)))
-                masks_enable = torch.tensor([0], dtype=torch.int)
-            else:
-                mask_input_dummy = sam_mask_prompt
-                masks_enable = torch.tensor([1], dtype=torch.int)
             sparse_embeddings, dense_embeddings, dense_pe = model.run(None, {"coords":sam_point_coords.numpy(), "labels":sam_point_labels.numpy(), "masks":mask_input_dummy.numpy(), "masks_enable":masks_enable.numpy()})
             sparse_embeddings = torch.Tensor(sparse_embeddings)
             dense_embeddings = torch.Tensor(dense_embeddings)
@@ -372,7 +374,63 @@ class SAM2Base(torch.nn.Module):
             print(ious.shape)
             print(sam_output_tokens.shape)
             print(object_score_logits.shape)
-        else:
+
+        if import_from_tflite:
+            import tensorflow as tf
+            prompt_encoder = tf.lite.Interpreter(model_path="model/prompt_encoder_"+model_id+".tflite")
+            mask_decoder = tf.lite.Interpreter(model_path="model/mask_decoder_"+model_id+".tflite")
+
+            prompt_encoder.allocate_tensors()
+            input_details = prompt_encoder.get_input_details()
+            output_details = prompt_encoder.get_output_details()
+            prompt_encoder.resize_tensor_input(
+                input_details[2]["index"], 
+                [1, sam_point_coords.shape[1], 2]
+            )
+            prompt_encoder.allocate_tensors()
+
+            prompt_encoder.set_tensor(input_details[2]["index"], sam_point_coords)
+            prompt_encoder.set_tensor(input_details[3]["index"], sam_point_labels)
+            prompt_encoder.set_tensor(input_details[0]["index"], mask_input_dummy)
+            prompt_encoder.set_tensor(input_details[1]["index"], masks_enable)
+            prompt_encoder.invoke()
+
+            sparse_embeddings = prompt_encoder.get_tensor(output_details[1]["index"])
+            dense_embeddings = prompt_encoder.get_tensor(output_details[2]["index"])
+            dense_pe = prompt_encoder.get_tensor(output_details[0]["index"])
+
+            mask_decoder.allocate_tensors()
+            input_details = mask_decoder.get_input_details()
+            output_details = mask_decoder.get_output_details()
+            mask_decoder.resize_tensor_input(
+                input_details[1]["index"], 
+                [1, sparse_embeddings.shape[1], 256]
+            )
+            mask_decoder.allocate_tensors()
+
+            batched_mode = False
+
+            mask_decoder.set_tensor(input_details[3]["index"], backbone_features.numpy())
+            mask_decoder.set_tensor(input_details[6]["index"], dense_pe.numpy())
+            mask_decoder.set_tensor(input_details[1]["index"], sparse_embeddings.numpy())
+            mask_decoder.set_tensor(input_details[2]["index"], dense_embeddings.numpy())
+            mask_decoder.set_tensor(input_details[5]["index"], batched_mode)
+            mask_decoder.set_tensor(input_details[0]["index"], high_res_features[0].numpy())
+            mask_decoder.set_tensor(input_details[4]["index"], high_res_features[1].numpy())
+            mask_decoder.invoke()
+
+            masks = mask_decoder.get_tensor(output_details[2]["index"])
+            iou_pred = mask_decoder.get_tensor(output_details[0]["index"])
+            sam_tokens_out = mask_decoder.get_tensor(output_details[3]["index"])
+            object_score_logits = mask_decoder.get_tensor(output_details[1]["index"])
+
+            low_res_multimasks, ious, sam_output_tokens, object_score_logits  = self.sam_mask_decoder.forward_postprocess(masks, iou_pred, sam_tokens_out, object_score_logits, multimask_output)
+            print(low_res_multimasks.shape)
+            print(ious.shape)
+            print(sam_output_tokens.shape)
+            print(object_score_logits.shape)
+
+        if not import_from_onnx and not import_from_tflite:
             print("begin mask decoder torch")
             print("backbone_features", backbone_features.shape)
             if sam_mask_prompt is None:
@@ -467,7 +525,7 @@ class SAM2Base(torch.nn.Module):
             object_score_logits,
         )
 
-    def _use_mask_as_output(self, backbone_features, high_res_features, mask_inputs, import_from_onnx, model_id):
+    def _use_mask_as_output(self, backbone_features, high_res_features, mask_inputs, import_from_onnx, import_from_tflite, model_id):
         """
         Directly turn binary `mask_inputs` into a output mask logits without using SAM.
         (same input and output shapes as in _forward_sam_heads above).
@@ -497,6 +555,7 @@ class SAM2Base(torch.nn.Module):
                 mask_inputs=self.mask_downsample(mask_inputs_float),
                 high_res_features=high_res_features,
                 import_from_onnx=import_from_onnx,
+                import_from_tflite=import_from_tflite,
                 model_id=model_id
             )
         # In this method, we are treating mask_input as output, e.g. using it directly to create spatial mem;
@@ -837,6 +896,8 @@ class SAM2Base(torch.nn.Module):
         # ONNX Export
         export_to_onnx=False,
         import_from_onnx=False,
+        export_to_tflite=False,
+        import_from_tflite=False,
         model_id=None
     ):
         current_out = {"point_inputs": point_inputs, "mask_inputs": mask_inputs}
@@ -854,7 +915,7 @@ class SAM2Base(torch.nn.Module):
             pix_feat = current_vision_feats[-1].permute(1, 2, 0)
             pix_feat = pix_feat.view(-1, self.hidden_dim, *feat_sizes[-1])
             sam_outputs = self._use_mask_as_output(
-                pix_feat, high_res_features, mask_inputs, import_from_onnx=import_from_onnx, model_id=model_id
+                pix_feat, high_res_features, mask_inputs, import_from_onnx=import_from_onnx, import_from_tflite=import_from_tflite, model_id=model_id
             )
         else:
             # fused the visual feature with previous memory features in the memory bank

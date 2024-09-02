@@ -15,6 +15,7 @@ import torch.nn.functional as F
 from torch import nn, Tensor
 
 from sam2.modeling.position_encoding import apply_rotary_enc, compute_axial_cis
+from sam2.modeling.position_encoding import apply_rotary_matenc, get_rotation_matrices
 from sam2.modeling.sam2_utils import MLP
 from sam2.utils.misc import get_sdpa_settings
 
@@ -24,6 +25,8 @@ OLD_GPU, USE_FLASH_ATTN, MATH_KERNEL_ON = get_sdpa_settings()
 # A fallback setting to allow all available kernels if Flash Attention fails
 ALLOW_ALL_KERNELS = False
 
+# Use matrix version of rotrary enc
+USE_MAT_ROTARY_ENC = True
 
 def sdp_kernel_context(dropout_p):
     """
@@ -309,6 +312,11 @@ class RoPEAttention(Attention):
         self.freqs_cis = freqs_cis
         self.rope_k_repeat = rope_k_repeat
 
+        if USE_MAT_ROTARY_ENC:
+            rotmats = get_rotation_matrices(dim=self.internal_dim // self.num_heads, end_x=feat_sizes[0], end_y=feat_sizes[1], theta=rope_theta)
+            self.rotmats = rotmats
+            self.rope_theta = rope_theta
+
     def forward(
         self, q: Tensor, k: Tensor, v: Tensor, num_k_exclude_rope: int = 0
     ) -> Tensor:
@@ -324,19 +332,34 @@ class RoPEAttention(Attention):
 
         # Apply rotary position encoding
         w = h = math.sqrt(q.shape[-2])
+
         self.freqs_cis = self.freqs_cis.to(q.device)
         if self.freqs_cis.shape[0] != q.shape[-2]:
             self.freqs_cis = self.compute_cis(end_x=w, end_y=h).to(q.device)
+
+        if USE_MAT_ROTARY_ENC:
+            self.rotmats = self.rotmats.to(q.device)
+            if self.rotmats.shape[0] != q.shape[-2]:
+                self.rotmats = get_rotation_matrices(dim=self.internal_dim // self.num_heads, end_x=w, end_y=h, theta=self.rope_theta)
+
         if q.shape[-2] != k.shape[-2]:
             assert self.rope_k_repeat
 
         num_k_rope = k.size(-2) - num_k_exclude_rope
-        q, k[:, :, :num_k_rope] = apply_rotary_enc(
-            q,
-            k[:, :, :num_k_rope],
-            freqs_cis=self.freqs_cis,
-            repeat_freqs_k=self.rope_k_repeat,
-        )
+        if USE_MAT_ROTARY_ENC:
+            q, k[:, :, :num_k_rope] = apply_rotary_matenc(
+                q,
+                k[:, :, :num_k_rope],
+                rotmats=self.rotmats,
+                repeat_freqs_k=self.rope_k_repeat,
+            )
+        else:
+            q, k[:, :, :num_k_rope] = apply_rotary_enc(
+                q,
+                k[:, :, :num_k_rope],
+                freqs_cis=self.freqs_cis,
+                repeat_freqs_k=self.rope_k_repeat,
+            )
 
         dropout_p = self.dropout_p if self.training else 0.0
         # Attention

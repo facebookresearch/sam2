@@ -723,7 +723,7 @@ class SAM2Base(torch.nn.Module):
         if import_from_onnx:
             import onnxruntime
             model = onnxruntime.InferenceSession("model/memory_attention_"+model_id+".onnx")
-            pix_feat_with_mem = model.run(None, {"curr":current_vision_feats[0].numpy(), "memory":memory.numpy(), "curr_pos":current_vision_pos_embeds[0].numpy(), "memory_pos":memory_pos_embed.numpy(), "num_obj_ptr_tokens":num_obj_ptr_tokens.numpy()})
+            pix_feat_with_mem = model.run(None, {"curr":current_vision_feats[0].numpy(), "memory":memory.numpy(), "curr_pos":current_vision_pos_embeds[0].numpy(), "memory_pos":memory_pos_embed.numpy(), "num_obj_ptr_tokens":num_obj_ptr_tokens})
         
         if not import_from_onnx:
             pix_feat_with_mem = self.memory_attention(

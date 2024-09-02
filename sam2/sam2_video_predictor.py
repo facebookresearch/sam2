@@ -35,6 +35,7 @@ class SAM2VideoPredictor(SAM2Base):
         self.non_overlap_masks = non_overlap_masks
         self.clear_non_cond_mem_around_input = clear_non_cond_mem_around_input
         self.clear_non_cond_mem_for_multi_obj = clear_non_cond_mem_for_multi_obj
+        self.image_encoder_onnx = None
 
     @torch.inference_mode()
     def init_state(
@@ -848,8 +849,9 @@ class SAM2VideoPredictor(SAM2Base):
                 print("begin image encoder onnx")
                 print(image.shape)
                 import onnxruntime
-                model = onnxruntime.InferenceSession("model/image_encoder_"+model_id+".onnx")
-                vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = model.run(None, {"input_image":image.numpy()})
+                if self.image_encoder_onnx == None:
+                    self.image_encoder_onnx = onnxruntime.InferenceSession("model/image_encoder_"+model_id+".onnx")
+                vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = self.image_encoder_onnx.run(None, {"input_image":image.numpy()})
             
             if import_from_tflite:
                 print("begin image encoder tflite")

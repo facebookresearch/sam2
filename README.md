@@ -41,6 +41,14 @@ python3 export_image_predictor.py --framework tflite
 python3 export_video_predictor.py --framework tflite
 ```
 
+## Test
+
+Replacing the complex tensor of RotaryEnc with matmul. To test this behavior, you can also run it with torch.
+
+```
+python3 export_video_predictor.py --framework torch
+```
+
 ## Artifacts
 
 ```

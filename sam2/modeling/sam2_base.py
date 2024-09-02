@@ -375,12 +375,19 @@ class SAM2Base(torch.nn.Module):
         else:
             print("begin mask decoder torch")
             print("backbone_features", backbone_features.shape)
-            sparse_embeddings, dense_embeddings = self.sam_prompt_encoder.forward_normal(
+            if sam_mask_prompt is None:
+                import numpy as np
+                mask_input_dummy = torch.Tensor(np.zeros((1, 256, 256)))
+                masks_enable = torch.tensor([0], dtype=torch.int)
+            else:
+                mask_input_dummy = sam_mask_prompt
+                masks_enable = torch.tensor([1], dtype=torch.int)
+            sparse_embeddings, dense_embeddings, dense_pe = self.sam_prompt_encoder.forward(
                 coords=sam_point_coords,
                 labels=sam_point_labels,
-                masks=sam_mask_prompt,
+                masks=mask_input_dummy,
+                masks_enable=masks_enable
             )
-            dense_pe = self.sam_prompt_encoder.get_dense_pe()
 
             (
                 low_res_multimasks,

@@ -3,9 +3,9 @@
 
 import argparse
 parser = argparse.ArgumentParser()
-parser.add_argument('model_id', default="hiera_t", choices=["hiera_l", "hiera_b+", "hiera_s", "hiera_t"])
-parser.add_argument('framework', default="onnx", choices=["onnx", "tflite"])
-parser.add_argument('accuracy', default="float", choices=["float", "int8"])
+parser.add_argument('-model_id', default="hiera_t", choices=["hiera_l", "hiera_b+", "hiera_s", "hiera_t"])
+parser.add_argument('-framework', default="onnx", choices=["onnx", "tflite"])
+parser.add_argument('-accuracy', default="float", choices=["float", "int8"])
 args = parser.parse_args()
 
 import os
@@ -26,9 +26,17 @@ import_from_onnx = args.framework=="onnx"
 
 # import
 if model_id == "hiera_l":
-   model_cfg = "sam2_hiera_l.yaml"
+    model_cfg = "sam2_hiera_l.yaml"
+    sam2_checkpoint = "./checkpoints/sam2_hiera_large.pt"
+elif model_id == "hiera_s":
+    model_cfg = "sam2_hiera_s.yaml"
+    sam2_checkpoint = "./checkpoints/sam2_hiera_small.pt"
+elif model_id == "hiera_b+":
+    model_cfg = "sam2_hiera_b+.yaml"
+    sam2_checkpoint = "./checkpoints/sam2_hiera_base+.pt"
 elif model_id == "hiera_t":
     model_cfg = "sam2_hiera_t.yaml"
+    sam2_checkpoint = "./checkpoints/sam2_hiera_tiny.pt"
 else:
     raise("unknown model type")
 
@@ -36,8 +44,6 @@ device = torch.device("cpu")
 print(f"using device: {device}")
 
 from sam2.build_sam import build_sam2_video_predictor
-
-sam2_checkpoint = "./checkpoints/sam2_hiera_large.pt"
 
 predictor = build_sam2_video_predictor(model_cfg, sam2_checkpoint, device=device)
 

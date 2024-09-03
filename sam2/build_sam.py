@@ -92,7 +92,10 @@ def build_sam2_hf(model_id, **kwargs):
         "facebook/sam2-hiera-large": ("sam2_hiera_l.yaml", "sam2_hiera_large.pt"),
     }
     config_name, checkpoint_name = model_id_to_filenames[model_id]
-    ckpt_path = hf_hub_download(repo_id=model_id, filename=checkpoint_name)
+    cache_dir = kwargs.get("cache_dir", None)
+    ckpt_path = hf_hub_download(
+        repo_id=model_id, filename=checkpoint_name, cache_dir=cache_dir
+    )
     return build_sam2(config_file=config_name, ckpt_path=ckpt_path, **kwargs)
 
 

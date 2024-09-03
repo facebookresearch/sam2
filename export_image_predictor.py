@@ -6,6 +6,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--model_id', default="hiera_t", choices=["hiera_l", "hiera_b+", "hiera_s", "hiera_t"])
 parser.add_argument('--framework', default="onnx", choices=["onnx", "tflite", "torch"])
 parser.add_argument('--accuracy', default="float", choices=["float", "int8"])
+parser.add_argument('--mode', default="both", choices=["both", "import", "export"])
 args = parser.parse_args()
 
 import os
@@ -22,13 +23,13 @@ os.makedirs("output", exist_ok=True)
 os.makedirs("model", exist_ok=True)
 
 # export settings
-export_to_onnx_image_encoder = args.framework == "onnx"
-export_to_onnx_mask_decoder = args.framework == "onnx"
-import_from_onnx = args.framework == "onnx"
+export_to_onnx_image_encoder = args.framework == "onnx" and (args.mode=="export" or args.mode=="both")
+export_to_onnx_mask_decoder = args.framework == "onnx" and (args.mode=="export" or args.mode=="both")
+import_from_onnx = args.framework == "onnx" and (args.mode=="import" or args.mode=="both")
 
-export_to_tflite_image_encoder = args.framework == "tflite"
-export_to_tflite_mask_decoder = args.framework == "tflite"
-import_from_tflite = args.framework == "tflite"
+export_to_tflite_image_encoder = args.framework == "tflite" and (args.mode=="export" or args.mode=="both")
+export_to_tflite_mask_decoder = args.framework == "tflite" and (args.mode=="export" or args.mode=="both")
+import_from_tflite = args.framework == "tflite" and (args.mode=="import" or args.mode=="both")
 
 tflite_int8 = args.accuracy == "int8"
 

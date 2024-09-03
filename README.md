@@ -25,7 +25,7 @@ torch 2.4.0
 ai-edge-torch 0.2.0
 ```
 
-## Run
+## Export and Inference
 
 onnx
 
@@ -39,6 +39,22 @@ tflite
 ```
 python3 export_image_predictor.py --framework tflite
 python3 export_video_predictor.py --framework tflite
+```
+
+## Inference only
+
+onnx
+
+```
+python3 export_image_predictor.py --framework onnx --mode import
+python3 export_video_predictor.py --framework onnx --mode import
+```
+
+tflite
+
+```
+python3 export_image_predictor.py --framework tflite --mode import
+python3 export_video_predictor.py --framework tflite --mode import
 ```
 
 ## Test

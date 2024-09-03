@@ -6,6 +6,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--model_id', default="hiera_t", choices=["hiera_l", "hiera_b+", "hiera_s", "hiera_t"])
 parser.add_argument('--framework', default="onnx", choices=["onnx", "tflite", "torch"])
 parser.add_argument('--accuracy', default="float", choices=["float", "int8"])
+parser.add_argument('--mode', default="both", choices=["both", "import", "export"])
 args = parser.parse_args()
 
 import os
@@ -21,10 +22,10 @@ os.makedirs("model", exist_ok=True)
 # export settings
 model_id = args.model_id
 
-export_to_onnx = args.framework=="onnx"
-import_from_onnx = args.framework=="onnx"
-export_to_tflite = args.framework=="tflite"
-import_from_tflite = args.framework=="tflite"
+export_to_onnx = args.framework=="onnx" and (args.mode=="export" or args.mode=="both")
+import_from_onnx = args.framework=="onnx" and (args.mode=="import" or args.mode=="both")
+export_to_tflite = args.framework=="tflite" and (args.mode=="export" or args.mode=="both")
+import_from_tflite = args.framework=="tflite" and (args.mode=="import" or args.mode=="both")
 
 # import
 if model_id == "hiera_l":

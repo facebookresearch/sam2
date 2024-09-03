@@ -178,4 +178,5 @@ class MemoryEncoder(nn.Module):
 
         pos = self.position_encoding(x).to(x.dtype)
 
-        return {"vision_features": x, "vision_pos_enc": [pos]}
+        return x, pos
+        

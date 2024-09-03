@@ -562,7 +562,9 @@ class SAM2VideoPredictor(SAM2Base):
                 batch_size=batch_size,
                 high_res_masks=high_res_masks,
                 is_mask_from_pts=True,  # these frames are what the user interacted with
+                export_to_onnx=export_to_tflite,
                 import_from_onnx=import_from_onnx,
+                export_to_tflite=export_to_tflite,
                 import_from_tflite=import_from_tflite,
                 model_id=model_id
             )
@@ -981,7 +983,7 @@ class SAM2VideoPredictor(SAM2Base):
         return compact_current_out, pred_masks_gpu
 
     def _run_memory_encoder(
-        self, inference_state, frame_idx, batch_size, high_res_masks, is_mask_from_pts, import_from_onnx, import_from_tflite, model_id
+        self, inference_state, frame_idx, batch_size, high_res_masks, is_mask_from_pts, export_to_onnx, import_from_onnx, export_to_tflite, import_from_tflite, model_id
     ):
         """
         Run the memory encoder on `high_res_masks`. This is usually after applying
@@ -997,6 +999,11 @@ class SAM2VideoPredictor(SAM2Base):
             feat_sizes=feat_sizes,
             pred_masks_high_res=high_res_masks,
             is_mask_from_pts=is_mask_from_pts,
+            export_to_onnx=export_to_onnx,
+            import_from_onnx=import_from_onnx,
+            export_to_tflite=export_to_tflite,
+            import_from_tflite=import_from_tflite,
+            model_id=model_id
         )
 
         # optionally offload the output to CPU memory to save GPU space

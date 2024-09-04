@@ -978,7 +978,7 @@ class SAM2Base(torch.nn.Module):
         if export_to_onnx and not self.memory_encoder_onnx_exported:
             self.memory_encoder_onnx_exported = True
             torch.onnx.export(
-                self.memory_encoder, (pix_feat, mask_for_mem, True), 'model/memory_encoder_'+model_id+'.onnx',
+                self.memory_encoder, (pix_feat, mask_for_mem), 'model/memory_encoder_'+model_id+'.onnx',
                 input_names=["pix_feat", "masks"],
                 output_names=["vision_features", "vision_pos_enc"],
                 verbose=False, opset_version=17
@@ -997,20 +997,20 @@ class SAM2Base(torch.nn.Module):
             self.memory_encoder_tflite_exported = True
             import ai_edge_torch
             import tensorflow as tf
-            sample_inputs = (pix_feat, mask_for_mem, True)
+            sample_inputs = (pix_feat, mask_for_mem)
             tfl_converter_flags = {'target_spec': {'supported_ops': [tf.lite.OpsSet.TFLITE_BUILTINS]}}
             edge_model = ai_edge_torch.convert(self.memory_encoder, sample_inputs, _ai_edge_converter_flags=tfl_converter_flags)
             edge_model.export("model/memory_encoder_"+model_id+".tflite")
 
             if import_from_tflite:
-                vision_features, vision_pos_enc = edge_model(sample_inputs)
+                vision_features, vision_pos_enc = edge_model(pix_feat, mask_for_mem)
                 vision_features = torch.Tensor(vision_features)
                 vision_pos_enc = torch.Tensor(vision_pos_enc)
 
         if not import_from_onnx and not import_from_tflite:
             print("begin memory encoder torch")
             vision_features, vision_pos_enc = self.memory_encoder(
-                pix_feat, mask_for_mem, skip_mask_sigmoid=True  # sigmoid already applied
+                pix_feat, mask_for_mem#, skip_mask_sigmoid=True  # sigmoid already applied (fixed to constant)
             )
 
         maskmem_features = vision_features

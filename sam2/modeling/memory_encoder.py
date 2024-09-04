@@ -159,8 +159,9 @@ class MemoryEncoder(nn.Module):
         self,
         pix_feat: torch.Tensor,
         masks: torch.Tensor,
-        skip_mask_sigmoid: bool = False,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
+        skip_mask_sigmoid = True # Fix for tflite
+
         ## Process masks
         # sigmoid, so that less domain shift from gt masks which are bool
         if not skip_mask_sigmoid:

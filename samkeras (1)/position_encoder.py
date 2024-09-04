@@ -160,4 +160,10 @@ def apply_rotary_enc(
 
     return xq_out, xk_out
     
-    
+
+'''
+Key Points:
+apply_rotary_enc: The implementation of apply_rotary_enc has been corrected to properly handle the rotation in TensorFlow using real and imaginary components.
+PositionEmbeddingSine: The call method now applies the RoPE rotation correctly using the updated apply_rotary_enc.
+PositionEmbeddingRandom: This class remains unchanged for encoding point prompts.
+Now, we can integrate this RoPE-based positional encoding module into the PromptEncoder and the ImageEncoder'''

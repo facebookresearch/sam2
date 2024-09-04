@@ -180,6 +180,7 @@ class SAM2Base(torch.nn.Module):
         self.max_cond_frames_in_attn = max_cond_frames_in_attn
 
         self.mlp_onnx_exported = False
+        self.mlp_tflite_exported = False
 
         # Model compilation
         if compile_image_encoder:
@@ -584,7 +585,20 @@ class SAM2Base(torch.nn.Module):
             obj_ptr = self.mlp_onnx.run(None, {"x":sam_output_token.numpy()})[0]
             obj_ptr = torch.Tensor(obj_ptr)
         
-        if not import_from_onnx:
+        if export_to_tflite and not self.mlp_tflite_exported:
+            self.mlp_tflite_exported = True
+            import ai_edge_torch
+            import tensorflow as tf
+            sample_inputs = (sam_output_token)
+            tfl_converter_flags = {'target_spec': {'supported_ops': [tf.lite.OpsSet.TFLITE_BUILTINS]}}
+            edge_model = ai_edge_torch.convert(self.obj_ptr_proj, sample_inputs, _ai_edge_converter_flags=tfl_converter_flags)
+            edge_model.export("model/mlp_"+model_id+".tflite")
+
+            if import_from_tflite:
+                obj_ptr = edge_model(sample_inputs)
+                obj_ptr = torch.Tensor(obj_ptr)
+
+        if not import_from_onnx and not import_from_tflite:
             obj_ptr = self.obj_ptr_proj(sam_output_token)
 
         if self.pred_obj_scores:
@@ -903,7 +917,7 @@ class SAM2Base(torch.nn.Module):
             sample_inputs = (current_vision_feats[0], memory, current_vision_pos_embeds[0], memory_pos_embed, num_obj_ptr_tokens)
             tfl_converter_flags = {'target_spec': {'supported_ops': [tf.lite.OpsSet.TFLITE_BUILTINS]}}
             edge_model = ai_edge_torch.convert(self.memory_attention, sample_inputs, _ai_edge_converter_flags=tfl_converter_flags)
-            edge_model.export("memory_attention_"+model_id+".tflite")
+            edge_model.export("model/memory_attention_"+model_id+".tflite")
 
             if import_from_tflite:
                 pix_feat_with_mem = edge_model(sample_inputs)
@@ -986,7 +1000,7 @@ class SAM2Base(torch.nn.Module):
             sample_inputs = (pix_feat, mask_for_mem, True)
             tfl_converter_flags = {'target_spec': {'supported_ops': [tf.lite.OpsSet.TFLITE_BUILTINS]}}
             edge_model = ai_edge_torch.convert(self.memory_encoder, sample_inputs, _ai_edge_converter_flags=tfl_converter_flags)
-            edge_model.export("memory_encoder"+model_id+".tflite")
+            edge_model.export("model/memory_encoder_"+model_id+".tflite")
 
             if import_from_tflite:
                 vision_features, vision_pos_enc = edge_model(sample_inputs)

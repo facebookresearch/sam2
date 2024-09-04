@@ -473,9 +473,9 @@ class SAM2Base(torch.nn.Module):
             batched_mode = False
 
             mask_decoder.set_tensor(input_details[3]["index"], backbone_features.numpy())
-            mask_decoder.set_tensor(input_details[6]["index"], dense_pe.numpy())
-            mask_decoder.set_tensor(input_details[1]["index"], sparse_embeddings.numpy())
-            mask_decoder.set_tensor(input_details[2]["index"], dense_embeddings.numpy())
+            mask_decoder.set_tensor(input_details[6]["index"], dense_pe)
+            mask_decoder.set_tensor(input_details[1]["index"], sparse_embeddings)
+            mask_decoder.set_tensor(input_details[2]["index"], dense_embeddings)
             mask_decoder.set_tensor(input_details[5]["index"], batched_mode)
             mask_decoder.set_tensor(input_details[0]["index"], high_res_features[0].numpy())
             mask_decoder.set_tensor(input_details[4]["index"], high_res_features[1].numpy())
@@ -486,6 +486,10 @@ class SAM2Base(torch.nn.Module):
             sam_tokens_out = mask_decoder.get_tensor(output_details[3]["index"])
             object_score_logits = mask_decoder.get_tensor(output_details[1]["index"])
 
+            masks = torch.Tensor(masks)
+            iou_pred = torch.Tensor(iou_pred)
+            sam_tokens_out = torch.Tensor(sam_tokens_out)
+            object_score_logits = torch.Tensor(object_score_logits)
             low_res_multimasks, ious, sam_output_tokens, object_score_logits  = self.sam_mask_decoder.forward_postprocess(masks, iou_pred, sam_tokens_out, object_score_logits, multimask_output)
             print(low_res_multimasks.shape)
             print(ious.shape)
@@ -589,14 +593,24 @@ class SAM2Base(torch.nn.Module):
             self.mlp_tflite_exported = True
             import ai_edge_torch
             import tensorflow as tf
-            sample_inputs = (sam_output_token)
+            sample_inputs = (sam_output_token,)
             tfl_converter_flags = {'target_spec': {'supported_ops': [tf.lite.OpsSet.TFLITE_BUILTINS]}}
             edge_model = ai_edge_torch.convert(self.obj_ptr_proj, sample_inputs, _ai_edge_converter_flags=tfl_converter_flags)
             edge_model.export("model/mlp_"+model_id+".tflite")
 
-            if import_from_tflite:
-                obj_ptr = edge_model(sample_inputs)
-                obj_ptr = torch.Tensor(obj_ptr)
+        if import_from_tflite:
+            import tensorflow as tf
+            mlp = tf.lite.Interpreter(model_path="model/mlp_"+model_id+".tflite")
+            mlp.allocate_tensors()
+            input_details = mlp.get_input_details()
+            output_details = mlp.get_output_details()
+            mlp.allocate_tensors()
+
+            mlp.set_tensor(input_details[0]["index"], sam_output_token.numpy())
+            mlp.invoke()
+
+            obj_ptr = mlp.get_tensor(output_details[0]["index"])
+            obj_ptr = torch.Tensor(obj_ptr)
 
         if not import_from_onnx and not import_from_tflite:
             obj_ptr = self.obj_ptr_proj(sam_output_token)
@@ -883,7 +897,7 @@ class SAM2Base(torch.nn.Module):
             #print("current_vision_pos_embeds", current_vision_pos_embeds[0].shape, current_vision_pos_embeds[0].dtype)
             #print("memory_pos_embed", memory_pos_embed.shape, memory_pos_embed.dtype)
             #print("num_obj_ptr_tokens", num_obj_ptr_tokens)
-            torch.onnx.export( # dynamo_export
+            torch.onnx.export(
                 self.memory_attention, (current_vision_feats[0], memory, current_vision_pos_embeds[0], memory_pos_embed, num_obj_ptr_tokens), 'model/memory_attention_'+model_id+'.onnx',
                 input_names=["curr", "memory", "curr_pos", "memory_pos", "num_obj_ptr_tokens"],
                 output_names=["pix_feat"],
@@ -910,7 +924,7 @@ class SAM2Base(torch.nn.Module):
             pix_feat_with_mem = self.memory_attention_onnx.run(None, {"curr":current_vision_feats[0].numpy(), "memory":memory.numpy(), "curr_pos":current_vision_pos_embeds[0].numpy(), "memory_pos":memory_pos_embed.numpy(), "num_obj_ptr_tokens":num_obj_ptr_tokens_numpy})
             pix_feat_with_mem = torch.Tensor(pix_feat_with_mem[0])
         
-        if export_to_tflite and not self.memory_attention_tflite_exported:
+        if False:#export_to_tflite and not self.memory_attention_tflite_exported:
             self.memory_attention_tflite_exported = True
             import ai_edge_torch
             import tensorflow as tf
@@ -923,7 +937,7 @@ class SAM2Base(torch.nn.Module):
                 pix_feat_with_mem = edge_model(sample_inputs)
                 pix_feat_with_mem = torch.Tensor(pix_feat_with_mem[0])
 
-        if not import_from_onnx and not import_from_tflite:
+        if not import_from_onnx:# and not import_from_tflite:
             print("begin memory attention torch")
             pix_feat_with_mem = self.memory_attention(
                 curr=current_vision_feats,
@@ -1002,10 +1016,22 @@ class SAM2Base(torch.nn.Module):
             edge_model = ai_edge_torch.convert(self.memory_encoder, sample_inputs, _ai_edge_converter_flags=tfl_converter_flags)
             edge_model.export("model/memory_encoder_"+model_id+".tflite")
 
-            if import_from_tflite:
-                vision_features, vision_pos_enc = edge_model(pix_feat, mask_for_mem)
-                vision_features = torch.Tensor(vision_features)
-                vision_pos_enc = torch.Tensor(vision_pos_enc)
+        if import_from_tflite:
+            import tensorflow as tf
+            memory_encoder = tf.lite.Interpreter(model_path="model/memory_encoder_"+model_id+".tflite")
+            memory_encoder.allocate_tensors()
+            input_details = memory_encoder.get_input_details()
+            output_details = memory_encoder.get_output_details()
+            memory_encoder.allocate_tensors()
+
+            memory_encoder.set_tensor(input_details[0]["index"], pix_feat.numpy())
+            memory_encoder.set_tensor(input_details[1]["index"], mask_for_mem.numpy())
+            memory_encoder.invoke()
+
+            vision_features = memory_encoder.get_tensor(output_details[1]["index"])
+            vision_pos_enc = memory_encoder.get_tensor(output_details[0]["index"])
+            vision_features = torch.Tensor(vision_features)
+            vision_pos_enc = torch.Tensor(vision_pos_enc)
 
         if not import_from_onnx and not import_from_tflite:
             print("begin memory encoder torch")

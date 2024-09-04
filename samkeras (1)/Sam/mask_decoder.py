@@ -1,5 +1,26 @@
 # modeling/sam/mask_decoder.py
 
+'''
+Explanation of Boolean Flags:
+use_high_res_features (Default: False)
+True: The MaskDecoder will use higher-resolution feature maps from the image encoder (if available) to improve the quality of the mask predictions. This is often beneficial but can increase computation.
+False: The decoder will only use the lowest-resolution feature map from the encoder.
+iou_prediction_use_sigmoid (Default: False)
+True: A sigmoid activation will be applied to the output of the IoU prediction head to ensure the IoU values are between 0 and 1.
+False: The IoU predictions will be raw logits (not constrained to 0-1).
+dynamic_multimask_via_stability (Default: False)
+True: During inference, the MaskDecoder will dynamically choose between the single mask output token and the best multimask output token based on the stability score. This helps improve robustness when dealing with ambiguous prompts.
+False: The decoder will always use the output token specified by multimask_output in the call method.
+pred_obj_scores (Default: False)
+True: The model will predict object scores in addition to masks. This can be useful for filtering out low-confidence mask predictions.
+False: The model will only predict masks.
+pred_obj_scores_mlp (Default: False)
+True: An MLP (Multi-Layer Perceptron) will be used to predict the object scores. This can potentially improve accuracy but adds more parameters to the model.
+False: A simple linear layer will be used to predict object scores.
+use_multimask_token_for_obj_ptr (Default: False)
+True: The model will use the output tokens from the multimask predictions to calculate object pointers.
+False: The model will use the single mask output token for object pointer calculation.'''
+
 from typing import List, Optional, Tuple, Type
 
 import tensorflow as tf

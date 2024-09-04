@@ -1,24 +1,22 @@
-# /modeling/sam/mask_decoder.py
-# sam2_tfkeras/modeling/sam/mask_decoder.py
+# modeling/sam/mask_decoder.py
 
 from typing import List, Optional, Tuple, Type
 
 import tensorflow as tf
 from tensorflow.keras import layers
 
-from sam2_tfkeras.modeling.sam2_utils import LayerNorm2d, MLP
-from sam2_tfkeras.modeling.sam.transformer import TwoWayTransformer
-from ncps.tf import CfC  
+from ..sam2_utils import LayerNorm2d, MLP
+from .transformer import TwoWayTransformer
+from ncps.tf import CfC 
 
 class MaskDecoder(layers.Layer):
     """
-    Predicts masks given an image and prompt embeddings, using a
-    transformer architecture.
+    Predicts masks given an image and prompt embeddings.
 
-    This implementation incorporates a CfC (Closed-form Continuous-time) layer 
-    to enhance the model's ability to capture temporal dynamics.
+    This implementation uses a hybrid approach, combining the original 
+    TwoWayTransformer from SAM with a CfC (Closed-form Continuous-time) 
+    layer from the `ncps` library to enhance temporal modeling. 
     """
-
     def __init__(
         self,
         *,
@@ -28,36 +26,67 @@ class MaskDecoder(layers.Layer):
         activation: Type[layers.Layer] = layers.Activation('gelu'),  # Activation function
         iou_head_depth: int = 3,  # Depth of the MLP for mask quality prediction
         iou_head_hidden_dim: int = 256,  # Hidden dimension of the MLP for mask quality
-        use_high_res_features: bool = False,  # Whether to use high-res features
-        iou_prediction_use_sigmoid=False,  # Whether to use sigmoid for IoU prediction
+        use_high_res_features: bool = False,  # Use high-resolution features in the decoder 
+        iou_prediction_use_sigmoid=False,  # Use sigmoid on the output of IoU prediction head 
         dynamic_multimask_via_stability=False,  # Dynamic multimask selection
-        dynamic_multimask_stability_delta=0.05,  # Delta for stability score
-        dynamic_multimask_stability_thresh=0.98,  # Threshold for stability score
-        pred_obj_scores: bool = False,  # Whether to predict object scores
-        pred_obj_scores_mlp: bool = False,  # Whether to use MLP for object score prediction
-        use_multimask_token_for_obj_ptr: bool = False,  # Use multimask token for object pointer
-        cfc_units: int = 128,  # Number of units in the CfC layer
-        mixed_memory: bool = True,  # Use mixed memory in CfC
-        cfc_mode: str = "default",  # Mode for the CfC layer 
+        dynamic_multimask_stability_delta=0.05,  # Delta used when computing the stability score
+        dynamic_multimask_stability_thresh=0.98,  # Threshold for the stability score
+        pred_obj_scores: bool = False,  # Whether to predict object scores 
+        pred_obj_scores_mlp: bool = False,  # Whether to use an MLP for object score prediction
+        use_multimask_token_for_obj_ptr: bool = False,  # Whether to use multimask output tokens for object pointers
+        cfc_units: int = 128, 
+        mixed_memory: bool = True, 
+        cfc_mode: str = "default",
     ) -> None:
+        """
+        Initializes the MaskDecoder.
+
+        Args:
+            transformer_dim (int): Channel dimension of the transformer.
+            transformer (layers.Layer): The transformer layer.
+            num_multimask_outputs (int, optional): Number of masks to predict for 
+                disambiguation. Defaults to 3.
+            activation (Type[layers.Layer], optional): Activation function. 
+                Defaults to layers.Activation('gelu').
+            iou_head_depth (int, optional): Depth of the MLP for mask quality 
+                prediction. Defaults to 3.
+            iou_head_hidden_dim (int, optional): Hidden dimension of the MLP for 
+                mask quality prediction. Defaults to 256.
+            use_high_res_features (bool, optional): Use high-resolution features 
+                in the decoder (if available from the backbone). Defaults to False.
+            iou_prediction_use_sigmoid (bool, optional): Use sigmoid on the 
+                output of IoU prediction head. Defaults to False.
+            dynamic_multimask_via_stability (bool, optional): Dynamic multimask selection 
+                based on stability score. Defaults to False.
+            dynamic_multimask_stability_delta (float, optional): Delta used when computing the 
+                stability score. Defaults to 0.05.
+            dynamic_multimask_stability_thresh (float, optional): Threshold for the 
+                stability score. Defaults to 0.98.
+            pred_obj_scores (bool, optional): Whether to predict object scores 
+                (in addition to masks). Defaults to False.
+            pred_obj_scores_mlp (bool, optional): Whether to use an MLP for object 
+                score prediction. Defaults to False.
+            use_multimask_token_for_obj_ptr (bool, optional): Whether to use multimask 
+                output tokens for object pointers. Defaults to False.
+            cfc_units (int, optional): Number of units in the CfC layer. Defaults to 128.
+            mixed_memory (bool, optional): Use mixed memory in CfC. Defaults to True.
+            cfc_mode (str, optional): Mode for the CfC layer. Defaults to "default".
+        """
         super(MaskDecoder, self).__init__()
         self.transformer_dim = transformer_dim
         self.transformer = transformer
 
         self.num_multimask_outputs = num_multimask_outputs
 
-        # Embeddings for IoU and mask tokens
         self.iou_token = layers.Embedding(1, transformer_dim)
         self.num_mask_tokens = num_multimask_outputs + 1
         self.mask_tokens = layers.Embedding(self.num_mask_tokens, transformer_dim)
 
-        # Object score prediction
         self.pred_obj_scores = pred_obj_scores
         if self.pred_obj_scores:
             self.obj_score_token = layers.Embedding(1, transformer_dim)
         self.use_multimask_token_for_obj_ptr = use_multimask_token_for_obj_ptr
 
-        # --- Upsampling Layers ---
         self.output_upscaling = tf.keras.Sequential([
             layers.Conv2DTranspose(
                 filters=transformer_dim // 4, 
@@ -66,29 +95,26 @@ class MaskDecoder(layers.Layer):
                 padding='same'
             ),
             LayerNorm2d(transformer_dim // 4),
-            activation, 
+            activation,
             layers.Conv2DTranspose(
                 filters=transformer_dim // 8, 
                 kernel_size=2, 
                 strides=2, 
                 padding='same' 
             ),
-            activation, 
+            activation,
         ])
 
-        # High-resolution features
         self.use_high_res_features = use_high_res_features
         if use_high_res_features:
             self.conv_s0 = layers.Conv2D(transformer_dim // 8, kernel_size=1, strides=1, padding='same')
             self.conv_s1 = layers.Conv2D(transformer_dim // 4, kernel_size=1, strides=1, padding='same')
 
-        # Output hypernetworks
         self.output_hypernetworks_mlps = [
             MLP(transformer_dim, transformer_dim, transformer_dim // 8, 3)
             for _ in range(self.num_mask_tokens)
         ]
 
-        # IoU prediction head
         self.iou_prediction_head = MLP(
             transformer_dim,
             iou_head_hidden_dim,
@@ -97,13 +123,11 @@ class MaskDecoder(layers.Layer):
             sigmoid_output=iou_prediction_use_sigmoid,
         )
 
-        # Object score prediction head
         if self.pred_obj_scores:
             self.pred_obj_score_head = layers.Dense(1) 
             if pred_obj_scores_mlp:
                 self.pred_obj_score_head = MLP(transformer_dim, transformer_dim, 1, 3)
 
-        # Dynamic multimask selection parameters
         self.dynamic_multimask_via_stability = dynamic_multimask_via_stability
         self.dynamic_multimask_stability_delta = dynamic_multimask_stability_delta
         self.dynamic_multimask_stability_thresh = dynamic_multimask_stability_thresh
@@ -140,14 +164,14 @@ class MaskDecoder(layers.Layer):
             dense_prompt_embeddings=dense_prompt_embeddings,
             repeat_image=repeat_image,
             high_res_features=high_res_features,
-            training=training
+            training=training 
         )
 
         # Select the appropriate masks based on output settings
         if multimask_output:
             masks = masks[:, 1:, :, :]
             iou_pred = iou_pred[:, 1:]
-        elif self.dynamic_multimask_via_stability and not training:
+        elif self.dynamic_multimask_via_stability and not training: 
             masks, iou_pred = self._dynamic_multimask_via_stability(masks, iou_pred)
         else:
             masks = masks[:, 0:1, :, :]
@@ -173,6 +197,7 @@ class MaskDecoder(layers.Layer):
         training=False, 
     ) -> Tuple[tf.Tensor, tf.Tensor]:
         """Predicts masks. See 'call' for more details."""
+
         # Concatenate output tokens
         s = 0
         if self.pred_obj_scores:
@@ -298,5 +323,3 @@ class MaskDecoder(layers.Layer):
             best_multimask_iou_scores,
         )
         return mask_logits_out, iou_scores_out 
-    
-    

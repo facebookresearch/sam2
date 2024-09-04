@@ -1,6 +1,4 @@
-# sam2keras/modeling/sam2_utils.py
-
-# sam2_tfkeras/modeling/sam2_utils.py
+# modeling/sam2_utils.py 
 
 import tensorflow as tf
 from tensorflow.keras import layers
@@ -152,7 +150,7 @@ class MLP(layers.Layer):
         self.num_layers = num_layers
         self.sigmoid_output = sigmoid_output
 
-        self.layers = [] # Use a list to store layers
+        self.layers = [] 
         for i in range(num_layers):
             in_dim = input_dim if i == 0 else hidden_dim
             out_dim = output_dim if i == num_layers - 1 else hidden_dim

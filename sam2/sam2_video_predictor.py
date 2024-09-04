@@ -302,6 +302,8 @@ class SAM2VideoPredictor(SAM2Base):
             prev_sam_mask_logits=prev_sam_mask_logits,
             import_from_onnx=import_from_onnx,
             export_to_onnx=export_to_onnx,
+            import_from_tflite=import_from_tflite,
+            export_to_tflite=export_to_tflite,
             model_id=model_id
         )
         # Add the output to the output dict (to be used as future memory)
@@ -401,6 +403,8 @@ class SAM2VideoPredictor(SAM2Base):
             run_mem_encoder=False,
             import_from_onnx=import_from_onnx,
             export_to_onnx=export_to_onnx,
+            import_from_tflite=import_from_tflite,
+            export_to_tflite=export_to_tflite,
             model_id=model_id
         )
         # Add the output to the output dict (to be used as future memory)
@@ -760,6 +764,8 @@ class SAM2VideoPredictor(SAM2Base):
                     run_mem_encoder=True,
                     import_from_onnx=import_from_onnx,
                     export_to_onnx=export_to_onnx,
+                    import_from_tflite=import_from_tflite,
+                    export_to_tflite=export_to_tflite,
                     model_id=model_id
                 )
                 output_dict[storage_key][frame_idx] = current_out

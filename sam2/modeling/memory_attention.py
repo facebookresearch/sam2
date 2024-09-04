@@ -59,13 +59,13 @@ class MemoryAttentionLayer(nn.Module):
         # Self-Attention
         tgt2 = self.norm1(tgt)
         q = k = tgt2 + query_pos if self.pos_enc_at_attn else tgt2
-        tgt2 = self.self_attn(q, k, v=tgt2)
+        tgt2 = self.self_attn(q, k, v=tgt2, num_k_exclude_rope=torch.tensor(0))
         tgt = tgt + self.dropout1(tgt2)
         return tgt
 
-    def _forward_ca(self, tgt, memory, query_pos, pos, num_k_exclude_rope=0):
+    def _forward_ca(self, tgt, memory, query_pos, pos, num_k_exclude_rope=torch.tensor(0)):
         kwds = {}
-        if num_k_exclude_rope > 0:
+        if num_k_exclude_rope.item() > 0:
             assert isinstance(self.cross_attn_image, RoPEAttention)
             kwds = {"num_k_exclude_rope": num_k_exclude_rope}
 
@@ -115,6 +115,31 @@ class MemoryAttention(nn.Module):
         self.norm = nn.LayerNorm(d_model)
         self.pos_enc_at_input = pos_enc_at_input
         self.batch_first = batch_first
+
+    def allocate_rope_attention_weight(
+        self,
+        curr: torch.Tensor,  # self-attention inputs
+        curr_pos: Optional[Tensor] = None,  # pos_enc for self-attention inputs
+    ):
+        if isinstance(curr, list):
+            assert isinstance(curr_pos, list)
+            assert len(curr) == len(curr_pos) == 1
+            curr, curr_pos = (
+                curr[0],
+                curr_pos[0],
+            )
+
+        output = curr
+
+        if self.batch_first:
+            # Convert to batch first
+            output = output.transpose(0, 1)
+
+        for layer in self.layers:
+            if isinstance(layer.cross_attn_image, RoPEAttention):
+                layer.cross_attn_image.allocate_rope_attention_weight(output)
+            if isinstance(layer.self_attn, RoPEAttention):
+                layer.self_attn.allocate_rope_attention_weight(output)
 
     def forward(
         self,

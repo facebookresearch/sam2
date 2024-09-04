@@ -37,6 +37,7 @@ python3 export_video_predictor.py --framework onnx
 tflite
 
 ```
+export PJRT_DEVICE=CPU
 python3 export_image_predictor.py --framework tflite
 python3 export_video_predictor.py --framework tflite
 ```
@@ -50,12 +51,7 @@ python3 export_image_predictor.py --framework onnx --mode import
 python3 export_video_predictor.py --framework onnx --mode import
 ```
 
-tflite
-
-```
-python3 export_image_predictor.py --framework tflite --mode import
-python3 export_video_predictor.py --framework tflite --mode import
-```
+tflite not supported inference only yet.
 
 ## Test
 
@@ -72,6 +68,11 @@ output/*
 model/*
 ```
 
+## Inference Example
+
+- [ailia-models](https://github.com/axinc-ai/ailia-models/tree/master/image_segmentation/segment-anything-2)
+- [ailia-models-tflite](https://github.com/axinc-ai/ailia-models-tflite/pull/90)
+
 ## Original document
 
-[README_ORIGINAL.md](README_ORIGINAL.md)
+- [README_ORIGINAL.md](README_ORIGINAL.md)

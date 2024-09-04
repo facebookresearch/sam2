@@ -1004,6 +1004,8 @@ class SAM2Base(torch.nn.Module):
 
             if import_from_tflite:
                 vision_features, vision_pos_enc = edge_model(sample_inputs)
+                vision_features = torch.Tensor(vision_features)
+                vision_pos_enc = torch.Tensor(vision_pos_enc)
 
         if not import_from_onnx and not import_from_tflite:
             print("begin memory encoder torch")

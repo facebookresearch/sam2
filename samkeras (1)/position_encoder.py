@@ -1,62 +1,12 @@
-# sam2keras/modeling/position_encoding.py
+# sam2_tfkeras/modeling/position_encoding.py
+
+import math
+from typing import Any, Optional, Tuple
+
+import numpy as np
 
 import tensorflow as tf
 from tensorflow.keras import layers
-import numpy as np
-import math
-from typing import Optional, Tuple
-
-# --- RoPE-related functions --- 
-
-def init_t_xy(end_x: int, end_y: int):
-    t = tf.range(end_x * end_y, dtype=tf.float32)
-    t_x = tf.cast(t % end_x, dtype=tf.float32)
-    t_y = tf.cast(tf.math.floordiv(t, end_x), dtype=tf.float32)
-    return t_x, t_y
-
-def compute_axial_cis(dim: int, end_x: int, end_y: int, theta: float = 10000.0):
-    freqs_x = 1.0 / (theta ** (tf.cast(tf.range(0, dim, 4)[: (dim // 4)], tf.float32) / dim))
-    freqs_y = 1.0 / (theta ** (tf.cast(tf.range(0, dim, 4)[: (dim // 4)], tf.float32) / dim))
-
-    t_x, t_y = init_t_xy(end_x, end_y)
-    freqs_x = tf.linalg.matmul(tf.expand_dims(t_x, axis=1), tf.expand_dims(freqs_x, axis=0))
-    freqs_y = tf.linalg.matmul(tf.expand_dims(t_y, axis=1), tf.expand_dims(freqs_y, axis=0))
-    freqs_cis_x = tf.complex(tf.ones_like(freqs_x), freqs_x)
-    freqs_cis_y = tf.complex(tf.ones_like(freqs_y), freqs_y)
-    return tf.concat([freqs_cis_x, freqs_cis_y], axis=-1)
-
-def reshape_for_broadcast(freqs_cis: tf.Tensor, x: tf.Tensor):
-    ndim = tf.rank(x)
-    assert 0 <= 1 < ndim
-    tf.debugging.assert_equal(tf.shape(freqs_cis), (tf.shape(x)[-2], tf.shape(x)[-1]))
-    shape = [tf.shape(x)[i] if i >= ndim - 2 else 1 for i in range(ndim)]
-    return tf.reshape(freqs_cis, shape)
-
-def apply_rotary_enc(
-    xq: tf.Tensor,
-    xk: tf.Tensor,
-    freqs_cis: tf.Tensor,
-    repeat_freqs_k: bool = False,
-):
-    xq_ = tf.reshape(tf.cast(xq, tf.complex64), (*tf.shape(xq)[:-1], -1, 2))
-    xk_ = (
-        tf.reshape(tf.cast(xk, tf.complex64), (*tf.shape(xk)[:-1], -1, 2))
-        if tf.shape(xk)[-2] != 0
-        else None
-    )
-    freqs_cis = reshape_for_broadcast(freqs_cis, xq_)
-    xq_out = tf.reshape(xq_ * freqs_cis, tf.shape(xq)[:-1])
-    if xk_ is None:
-        # no keys to rotate, due to dropout
-        return tf.cast(xq_out, tf.float32), xk
-    # repeat freqs along seq_len dim to match k seq_len
-    if repeat_freqs_k:
-        r = tf.shape(xk_)[-2] // tf.shape(xq_)[-2]
-        freqs_cis = tf.tile(freqs_cis, [*tf.ones(tf.rank(freqs_cis)-2, tf.int32), r, 1])
-    xk_out = tf.reshape(xk_ * freqs_cis, tf.shape(xk)[:-1])
-    return tf.cast(xq_out, tf.float32), tf.cast(xk_out, tf.float32)
-
-# --- Position Embedding Classes ---
 
 class PositionEmbeddingSine(layers.Layer):
     """
@@ -66,9 +16,9 @@ class PositionEmbeddingSine(layers.Layer):
         self,
         num_pos_feats: int,
         temperature: int = 10000,
-        normalize: bool = False, # Typically not normalized in RoPE
+        normalize: bool = False, 
         scale: Optional[float] = None,
-        feat_sizes=(32, 32), # Size of feature maps for RoPE 
+        feat_sizes=(32, 32),  
     ):
         super(PositionEmbeddingSine, self).__init__()
         if scale is not None and normalize is False:
@@ -84,27 +34,25 @@ class PositionEmbeddingSine(layers.Layer):
         self.compute_cis = lambda end_x, end_y: compute_axial_cis(dim=self.num_pos_feats, theta=temperature, end_x=end_x, end_y=end_y)
         self.freqs_cis = self.compute_cis(feat_sizes[0], feat_sizes[1])
 
-    def call(self, x: tf.Tensor):
+    def call(self, x: tf.Tensor, training=False):
         """
         Applies RoPE positional encoding to the input tensor.
-
-        Args:
-            x: Input tensor.
-
-        Returns:
-            tf.Tensor: Tensor with RoPE positional encoding applied.
         """
-        bs, c, h, w = tf.shape(x) # Input shape is (B, C, H, W)
+        bs, c, h, w = tf.shape(x)  
 
-        # Flatten the spatial dimensions
-        x = tf.reshape(x, (bs, c, -1)) # Shape: (B, C, H*W)
+        # Flatten the spatial dimensions and split into (x, y)
+        x = tf.transpose(tf.reshape(x, (bs, c, -1)), perm=[0, 2, 1])  # Shape: (B, H*W, C)
+        x = tf.reshape(x, (bs, h, w, c))
 
         # Apply RoPE using the precomputed freqs_cis
         x, _ = apply_rotary_enc(x, x, self.freqs_cis) 
 
-        # Reshape back to the original spatial dimensions 
-        x = tf.reshape(x, (bs, c, h, w)) # (B, C, H, W)
-        return x 
+        # Reshape back to the original format
+        x = tf.reshape(x, (bs, h*w, c))  
+        x = tf.transpose(x, perm=[0, 2, 1])
+        x = tf.reshape(x, (bs, c, h, w)) 
+
+        return x
 
 class PositionEmbeddingRandom(layers.Layer):
     """
@@ -155,19 +103,61 @@ class PositionEmbeddingRandom(layers.Layer):
             [coords[0, 0, 0]/ image_size[1], coords[0, 1, 0] / image_size[0]]
         )
         coords = tf.transpose(coords, perm=[0, 2, 1])
-        return self._pe_encoding(tf.cast(coords, tf.float32))  # B x N x C 
+        return self._pe_encoding(tf.cast(coords, tf.float32))  # B x N x C
+
+# Rotary Positional Encoding (RoPE) Functions
+
+def init_t_xy(end_x: int, end_y: int):
+    t = tf.range(end_x * end_y, dtype=tf.float32)
+    t_x = tf.cast(t % end_x, dtype=tf.float32)
+    t_y = tf.cast(tf.math.floordiv(t, end_x), dtype=tf.float32)
+    return t_x, t_y
+
+def compute_axial_cis(dim: int, end_x: int, end_y: int, theta: float = 10000.0):
+    freqs_x = 1.0 / (theta ** (tf.cast(tf.range(0, dim, 4)[: (dim // 4)], tf.float32) / dim))
+    freqs_y = 1.0 / (theta ** (tf.cast(tf.range(0, dim, 4)[: (dim // 4)], tf.float32) / dim))
+
+    t_x, t_y = init_t_xy(end_x, end_y)
+    freqs_x = tf.linalg.matmul(tf.expand_dims(t_x, axis=1), tf.expand_dims(freqs_x, axis=0))
+    freqs_y = tf.linalg.matmul(tf.expand_dims(t_y, axis=1), tf.expand_dims(freqs_y, axis=0))
+    freqs_cis_x = tf.complex(tf.ones_like(freqs_x), freqs_x)
+    freqs_cis_y = tf.complex(tf.ones_like(freqs_y), freqs_y)
+    return tf.concat([freqs_cis_x, freqs_cis_y], axis=-1)
+
+def reshape_for_broadcast(freqs_cis: tf.Tensor, x: tf.Tensor):
+    ndim = tf.rank(x)
+    assert 0 <= 1 < ndim
+    tf.debugging.assert_equal(tf.shape(freqs_cis), (tf.shape(x)[-2], tf.shape(x)[-1]))
+    shape = [tf.shape(x)[i] if i >= ndim - 2 else 1 for i in range(ndim)]
+    return tf.reshape(freqs_cis, shape)
+
+def apply_rotary_enc(
+    xq: tf.Tensor,
+    xk: tf.Tensor,
+    freqs_cis: tf.Tensor,
+    repeat_freqs_k: bool = False,
+):
+    # Split into real and imaginary components 
+    xq_ = tf.split(xq, 2, axis=-1) 
+    xq_real, xq_imag = tf.squeeze(xq_[0], axis=-1), tf.squeeze(xq_[1], axis=-1)
+
+    xk_ = tf.split(xk, 2, axis=-1) 
+    xk_real, xk_imag = tf.squeeze(xk_[0], axis=-1), tf.squeeze(xk_[1], axis=-1)
+
+    freqs_cis_real = tf.math.real(freqs_cis)
+    freqs_cis_imag = tf.math.imag(freqs_cis)
+
+    # Apply RoPE rotation 
+    xq_out_real = xq_real * freqs_cis_real - xq_imag * freqs_cis_imag
+    xq_out_imag = xq_real * freqs_cis_imag + xq_imag * freqs_cis_real
+
+    xk_out_real = xk_real * freqs_cis_real - xk_imag * freqs_cis_imag
+    xk_out_imag = xk_real * freqs_cis_imag + xk_imag * freqs_cis_real
+
+    # Concatenate back the real and imaginary components
+    xq_out = tf.concat([tf.expand_dims(xq_out_real, axis=-1), tf.expand_dims(xq_out_imag, axis=-1)], axis=-1)
+    xk_out = tf.concat([tf.expand_dims(xk_out_real, axis=-1), tf.expand_dims(xk_out_imag, axis=-1)], axis=-1) 
+
+    return xq_out, xk_out
     
     
-    '''**Explanation and Key Changes:**
-
-- **`PositionEmbeddingSine` with RoPE:**
-    - This class is now implemented using RoPE. 
-    - The `call` method applies the rotary embeddings to the input tensor using the `apply_rotary_enc` function, which handles the complex number operations required for RoPE.
-    - The `feat_sizes` argument in the constructor is used to determine the dimensions for the RoPE calculations. 
-- **`PositionEmbeddingRandom`:**  This class remains unchanged from the previous version, as it's not directly related to RoPE. 
-
-**Next Steps:**
-
-1. **Integration:**  You can now use the RoPE-based `PositionEmbeddingSine` class in the other modules, especially in the `PromptEncoder` and the `ImageEncoder`.
-2. **Complete Remaining Conversions:**  Continue with the conversion of `sam2_image_predictor.py`, `build_sam.py`, and the other files as needed.
-'''

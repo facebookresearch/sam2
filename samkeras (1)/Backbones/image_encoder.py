@@ -1,4 +1,4 @@
-# /modeling/backbones/image_encoder.py
+# sam2keras/modeling/backbones/image_encoder.py
 
 from typing import List, Optional
 

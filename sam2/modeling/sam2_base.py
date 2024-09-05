@@ -915,13 +915,18 @@ class SAM2Base(torch.nn.Module):
                 input_names=["curr", "memory_1", "memory_2", "curr_pos", "memory_pos_1", "memory_pos_2"],
                 output_names=["pix_feat"],
                 dynamic_axes={
-                    'memory_1': {1: 'n'},
-                    'memory_2': {1: 'n'},
-                    'memory_pos_1': {1: 'n'},
-                    'memory_pos_2': {1: 'n'}
+                    'memory_1': {0: 'n_1'},
+                    'memory_2': {0: 'n_2'},
+                    'memory_pos_1': {0: 'n_1'},
+                    'memory_pos_2': {0: 'n_2'}
                 },
                 verbose=False, opset_version=17
             )
+            #export_options = torch.onnx.ExportOptions(dynamic_shapes=True)
+            #onnx_program  =torch.onnx.dynamo_export(
+            #    self.memory_attention, current_vision_feats[0], memory_1, memory_2, current_vision_pos_embeds[0], memory_pos_embed_1, memory_pos_embed_2, export_options=export_options
+            #)
+            #onnx_program.save('model/memory_attention_'+model_id+'.onnx')
 
         if import_from_onnx:
             print("begin memory attention onnx")

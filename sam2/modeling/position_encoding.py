@@ -253,13 +253,13 @@ def apply_rotary_matenc(xq, xk, rotmats, repeat_freqs_k=False):
     # tfliteでは4次元テンソルまでしか扱えないのでバッチサイズに制約をかける
 
     bq, hq, nq, cq = xq.shape
-    torch._check_is_size(bq)
-    torch._check_is_size(hq)
-    torch._check_is_size(nq)
-    torch._check_is_size(cq)
-    torch._check(bq == 1) # for dynamo trace
-    torch._check(hq == 1) # for dynamo trace
-    torch._check(cq == 256) # for dynamo trace
+    #torch._check_is_size(bq)
+    #torch._check_is_size(hq)
+    #torch._check_is_size(nq)
+    #torch._check_is_size(cq)
+    #torch._check(bq == 1) # for dynamo trace
+    #torch._check(hq == 1) # for dynamo trace
+    #torch._check(cq == 256) # for dynamo trace
 
     #print(rotmats.shape)
 
@@ -271,9 +271,9 @@ def apply_rotary_matenc(xq, xk, rotmats, repeat_freqs_k=False):
     k_rotmat = q_rotmat.repeat(nk // nq, 1, 1, 1)# if repeat_freqs_k else rotmats # for tflite trace, repeat_freqs_k == Falseの場合は nk // nq == 1 なのでrepeatを常に呼び出しても等価になる
 
     bk, hk, nk, ck = xk.shape
-    torch._check_is_size(bq == 1)
-    torch._check_is_size(hq == 1)
-    torch._check(ck == 256)
+    #torch._check_is_size(bq == 1)
+    #torch._check_is_size(hq == 1)
+    #torch._check(ck == 256)
 
     #torch._check(xk.size(3) == 256)
     

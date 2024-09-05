@@ -198,16 +198,9 @@ def apply_rotary_enc(
     repeat_freqs_k: bool = False,
 ):
     xq_ = torch.view_as_complex(xq.float().reshape(*xq.shape[:-1], -1, 2))
-    xk_ = (
-        torch.view_as_complex(xk.float().reshape(*xk.shape[:-1], -1, 2))
-        if xk.shape[-2] != 0
-        else None
-    )
+    xk_ = torch.view_as_complex(xk.float().reshape(*xk.shape[:-1], -1, 2))
     freqs_cis = reshape_for_broadcast(freqs_cis, xq_)
     xq_out = torch.view_as_real(xq_ * freqs_cis).flatten(3)
-    if xk_ is None:
-        # no keys to rotate, due to dropout
-        return xq_out.type_as(xq).to(xq.device), xk
     # repeat freqs along seq_len dim to match k seq_len
     if repeat_freqs_k:
         r = xk_.shape[-2] // xq_.shape[-2]
@@ -250,12 +243,46 @@ def get_rotation_matrices(dim, end_x, end_y, theta=10000.0, device=None, dtype=N
 
 
 def apply_rotary_matenc(xq, xk, rotmats, repeat_freqs_k=False):
-    
-    bq, hq, nq, cq = xq.shape
-    bk, hk, nk, ck = xk.shape
+    # オリジナル実装 (6次元テンソル処理)
+    #bq, hq, nq, cq = xq.shape
+    #bk, hk, nk, ck = xk.shape
+    #q_out = torch.matmul(rotmats, xq.reshape(bq, hq, nq, cq // 2, 2, 1)).flatten(3)
+    #k_rotmat = rotmats.repeat(1, 1, nk // nq, 1, 1, 1) if repeat_freqs_k else rotmats
+    #k_out = torch.matmul(k_rotmat, xk.reshape(bk, hk, nk, ck // 2, 2, 1)).flatten(3)
 
-    q_out = torch.matmul(rotmats, xq.reshape(bq, hq, nq, cq // 2, 2, 1)).flatten(3)
-    k_rotmat = rotmats.repeat(1, 1, nk // nq, 1, 1, 1) if repeat_freqs_k else rotmats
-    k_out = torch.matmul(k_rotmat, xk.reshape(bk, hk, nk, ck // 2, 2, 1)).flatten(3)
+    # tfliteでは4次元テンソルまでしか扱えないのでバッチサイズに制約をかける
+
+    bq, hq, nq, cq = xq.shape
+    torch._check_is_size(bq)
+    torch._check_is_size(hq)
+    torch._check_is_size(nq)
+    torch._check_is_size(cq)
+    torch._check(bq == 1) # for dynamo trace
+    torch._check(hq == 1) # for dynamo trace
+    torch._check(cq == 256) # for dynamo trace
+
+    #print(rotmats.shape)
+
+    q_rotmat = rotmats.reshape(4096, 128, 2, 2)
+    q_out = torch.matmul(q_rotmat, xq.reshape(nq, 128, 2, 1)).reshape(1, 1, 4096, 256)
+    #print(q_out.shape)
+
+    bk, hk, nk, ck = xk.shape
+    k_rotmat = q_rotmat.repeat(nk // nq, 1, 1, 1)# if repeat_freqs_k else rotmats # for tflite trace, repeat_freqs_k == Falseの場合は nk // nq == 1 なのでrepeatを常に呼び出しても等価になる
+
+    bk, hk, nk, ck = xk.shape
+    torch._check_is_size(bq == 1)
+    torch._check_is_size(hq == 1)
+    torch._check(ck == 256)
+
+    #torch._check(xk.size(3) == 256)
+    
+    k_in = xk.reshape(nk, ck//2, 2, 1)
+    k_in = k_in[:k_rotmat.shape[0], :, :, :]
+    k_out = torch.matmul(k_rotmat, k_in).reshape(1, 1, nk // nq * 4096, 256)
+
+    #print("k_rotmat", k_rotmat.shape)
+    #print("k_in", k_in.shape)
+    #print("k_out", k_out.shape)
 
     return q_out, k_out

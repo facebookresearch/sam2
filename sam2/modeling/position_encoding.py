@@ -268,7 +268,7 @@ def apply_rotary_matenc(xq, xk, rotmats, repeat_freqs_k=False):
     #print(q_out.shape)
 
     bk, hk, nk, ck = xk.shape
-    k_rotmat = q_rotmat.repeat(nk // nq, 1, 1, 1)# if repeat_freqs_k else rotmats # for tflite trace, repeat_freqs_k == Falseの場合は nk // nq == 1 なのでrepeatを常に呼び出しても等価になる
+    k_rotmat = q_rotmat.repeat(nk // 4096, 1, 1, 1)# if repeat_freqs_k else rotmats # for tflite trace, repeat_freqs_k == Falseの場合は nk // nq == 1 なのでrepeatを常に呼び出しても等価になる
 
     bk, hk, nk, ck = xk.shape
     #torch._check_is_size(bq == 1)

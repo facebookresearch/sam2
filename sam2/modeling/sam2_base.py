@@ -207,7 +207,7 @@ class SAM2Base(torch.nn.Module):
         assert(self.image_size == 1024)
         assert(self.num_feature_levels == 3)
         assert(self.hidden_dim == 256)
-        assert(self.num_maskmem == 7)
+        assert(self.num_maskmem == 1 or self.num_maskmem == 7)
         assert(self.directly_add_no_mem_embed == True)
         #assert(self.training == False)
         assert(self.mem_dim == 64)
@@ -235,7 +235,7 @@ class SAM2Base(torch.nn.Module):
         assert(self.sam_mask_decoder.dynamic_multimask_stability_thresh == 0.98)
         assert(self.max_cond_frames_in_attn == -1)
         assert(self.memory_temporal_stride_for_eval == 1)
-        assert(self.max_obj_ptrs_in_encoder == 16)
+        assert(self.max_obj_ptrs_in_encoder == 1 or self.max_obj_ptrs_in_encoder == 16)
         assert(self.only_obj_ptrs_in_the_past_for_eval == True)
         assert(self.multimask_output_for_tracking == True)
         assert(self.use_multimask_token_for_obj_ptr == True)
@@ -903,6 +903,13 @@ class SAM2Base(torch.nn.Module):
         memory_pos_embed_1 = memory_pos_embed[:-num_obj_ptr_tokens,:,:]
         memory_pos_embed_2 = memory_pos_embed[-num_obj_ptr_tokens:,:,:]
 
+        print("memory attention shape")
+        print("curr", current_vision_feats[0].shape)
+        print("memory", memory.shape)
+        print("curr_pos", current_vision_pos_embeds[0].shape)
+        print("memory_pos", memory_pos_embed.shape)
+        print("num_obj_ptr_tokens", num_obj_ptr_tokens)
+
         if export_to_onnx and not self.memory_attention_onnx_exported:
             self.memory_attention_onnx_exported = True
             #print("current_vision_feats", current_vision_feats[0].shape, current_vision_feats[0].dtype)
@@ -950,19 +957,22 @@ class SAM2Base(torch.nn.Module):
             import tensorflow as tf
             sample_inputs = (current_vision_feats[0], memory_1, memory_2, current_vision_pos_embeds[0], memory_pos_embed_1, memory_pos_embed_2)
             tfl_converter_flags = {'target_spec': {'supported_ops': [tf.lite.OpsSet.TFLITE_BUILTINS]}}
-            n_1 = torch.export.Dim("n_1", min=1, max=256)
-            n_4096 = n_1 * 4096
-            n_2 = torch.export.Dim("n_2", min=1, max=256)
-            n_4 = n_2 * 4
-            dynamic_shapes={
-                'curr': None,
-                'memory_1': {0: n_4096},
-                'memory_2': {0: n_4},
-                'curr_pos': None,
-                'memory_pos_1': {0: n_4096},
-                'memory_pos_2': {0: n_4}
-            }
-            edge_model = ai_edge_torch.convert(self.memory_attention, sample_inputs, _ai_edge_converter_flags=tfl_converter_flags, dynamic_shapes=dynamic_shapes)
+            if self.num_maskmem == 1 and self.max_obj_ptrs_in_encoder == 1:
+                edge_model = ai_edge_torch.convert(self.memory_attention, sample_inputs, _ai_edge_converter_flags=tfl_converter_flags)
+            else:
+                n_1 = torch.export.Dim("n_1", min=1, max=256)
+                n_4096 = n_1 * 4096
+                n_2 = torch.export.Dim("n_2", min=1, max=256)
+                n_4 = n_2 * 4
+                dynamic_shapes={
+                    'curr': None,
+                    'memory_1': {0: n_4096},
+                    'memory_2': {0: n_4},
+                    'curr_pos': None,
+                    'memory_pos_1': {0: n_4096},
+                    'memory_pos_2': {0: n_4}
+                }
+                edge_model = ai_edge_torch.convert(self.memory_attention, sample_inputs, _ai_edge_converter_flags=tfl_converter_flags, dynamic_shapes=dynamic_shapes)
             edge_model.export("model/memory_attention_"+model_id+".tflite")
 
         if import_from_tflite:

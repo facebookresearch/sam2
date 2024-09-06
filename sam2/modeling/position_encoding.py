@@ -277,9 +277,9 @@ def apply_rotary_matenc(xq, xk, rotmats, repeat_freqs_k=False):
 
     #torch._check(xk.size(3) == 256)
     
-    k_in = xk.reshape(nk, ck//2, 2, 1)
-    k_in = k_in[:k_rotmat.shape[0], :, :, :]
-    k_out = torch.matmul(k_rotmat, k_in).reshape(1, 1, nk // nq * 4096, 256)
+    k_in = xk.reshape(nk, 128, 2, 1)
+    #k_in = k_in[:k_rotmat.shape[0], :, :, :]
+    k_out = torch.matmul(k_rotmat, k_in).reshape(1, 1, nk, 256)
 
     #print("k_rotmat", k_rotmat.shape)
     #print("k_in", k_in.shape)

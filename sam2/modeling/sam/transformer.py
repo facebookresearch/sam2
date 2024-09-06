@@ -344,17 +344,17 @@ class RoPEAttention(Attention):
         v = self._separate_heads(v, self.num_heads)
 
         # Apply rotary position encoding
-        if USE_MAT_ROTARY_ENC:
-            #self.rotmats = self.rotmats.to(q.device)
-            if self.rotmats.shape[2] != q.shape[-2]:
-                raise("rotmat shape error " + str(self.rotmats.shape[2]) + " " + str(q.shape[-2]))
-        else:
-            #self.freqs_cis = self.freqs_cis.to(q.device)
-            if self.freqs_cis.shape[0] != q.shape[-2]:
-                raise("freqs_cis shape error " + str(self.freqs_cis.shape[0]) + " " + str(q.shape[-2]))
+        #if USE_MAT_ROTARY_ENC:
+        #    #self.rotmats = self.rotmats.to(q.device)
+        #    if self.rotmats.shape[2] != q.shape[-2]:
+        #        raise("rotmat shape error " + str(self.rotmats.shape[2]) + " " + str(q.shape[-2]))
+        #else:
+        #    #self.freqs_cis = self.freqs_cis.to(q.device)
+        #    if self.freqs_cis.shape[0] != q.shape[-2]:
+        #        raise("freqs_cis shape error " + str(self.freqs_cis.shape[0]) + " " + str(q.shape[-2]))
 
-        if q.shape[-2] != k.shape[-2]:
-            assert self.rope_k_repeat
+        #if q.shape[-2] != k.shape[-2]:
+        #    assert self.rope_k_repeat
 
         if USE_MAT_ROTARY_ENC:
             q, k = apply_rotary_matenc(
@@ -412,17 +412,17 @@ class RoPEAttention(Attention):
         v_2 = self._separate_heads(v_2, self.num_heads)
 
         # Apply rotary position encoding
-        if USE_MAT_ROTARY_ENC:
-            #self.rotmats = self.rotmats.to(q.device)
-            if self.rotmats.shape[2] != q.shape[-2]:
-                raise("rotmat shape error " + str(self.rotmats.shape[2]) + " " + str(q.shape[-2]))
-        else:
-            #self.freqs_cis = self.freqs_cis.to(q.device)
-            if self.freqs_cis.shape[0] != q.shape[-2]:
-                raise("freqs_cis shape error " + str(self.freqs_cis.shape[0]) + " " + str(q.shape[-2]))
+        #if USE_MAT_ROTARY_ENC:
+        #    #self.rotmats = self.rotmats.to(q.device)
+        #    if self.rotmats.shape[2] != q.shape[-2]:
+        #        raise("rotmat shape error " + str(self.rotmats.shape[2]) + " " + str(q.shape[-2]))
+        #else:
+        #    #self.freqs_cis = self.freqs_cis.to(q.device)
+        #    if self.freqs_cis.shape[0] != q.shape[-2]:
+        #        raise("freqs_cis shape error " + str(self.freqs_cis.shape[0]) + " " + str(q.shape[-2]))
 
-        if q.shape[-2] != k_1.shape[-2]:
-            assert self.rope_k_repeat
+        #if q.shape[-2] != k_1.shape[-2]:
+        #    assert self.rope_k_repeat
 
         if USE_MAT_ROTARY_ENC:
             q, k_1 = apply_rotary_matenc(

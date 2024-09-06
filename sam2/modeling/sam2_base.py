@@ -950,13 +950,27 @@ class SAM2Base(torch.nn.Module):
             import tensorflow as tf
             sample_inputs = (current_vision_feats[0], memory_1, memory_2, current_vision_pos_embeds[0], memory_pos_embed_1, memory_pos_embed_2)
             tfl_converter_flags = {'target_spec': {'supported_ops': [tf.lite.OpsSet.TFLITE_BUILTINS]}}
-            edge_model = ai_edge_torch.convert(self.memory_attention, sample_inputs, _ai_edge_converter_flags=tfl_converter_flags)
+            n_1 = torch.export.Dim("n_1", min=1, max=256)
+            n_4096 = n_1 * 4096
+            n_2 = torch.export.Dim("n_2", min=1, max=256)
+            n_4 = n_2 * 4
+            dynamic_shapes={
+                'curr': None,
+                'memory_1': {0: n_4096},
+                'memory_2': {0: n_4},
+                'curr_pos': None,
+                'memory_pos_1': {0: n_4096},
+                'memory_pos_2': {0: n_4}
+            }
+            edge_model = ai_edge_torch.convert(self.memory_attention, sample_inputs, _ai_edge_converter_flags=tfl_converter_flags, dynamic_shapes=dynamic_shapes)
             edge_model.export("model/memory_attention_"+model_id+".tflite")
 
         if import_from_tflite:
             import tensorflow as tf
+            import os
+            #os.environ['TF_ENABLE_XNNPACK'] = '0'
             memory_attention = tf.lite.Interpreter(model_path="model/memory_attention_"+model_id+".tflite")
-            memory_attention.allocate_tensors()
+            #memory_attention.allocate_tensors()
             input_details = memory_attention.get_input_details()
             output_details = memory_attention.get_output_details()
             memory_attention.resize_tensor_input(

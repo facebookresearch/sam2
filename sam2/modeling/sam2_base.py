@@ -207,7 +207,7 @@ class SAM2Base(torch.nn.Module):
         assert(self.image_size == 1024)
         assert(self.num_feature_levels == 3)
         assert(self.hidden_dim == 256)
-        assert(self.num_maskmem == 1 or self.num_maskmem == 7)
+        assert(self.num_maskmem == 7)
         assert(self.directly_add_no_mem_embed == True)
         #assert(self.training == False)
         assert(self.mem_dim == 64)
@@ -235,10 +235,16 @@ class SAM2Base(torch.nn.Module):
         assert(self.sam_mask_decoder.dynamic_multimask_stability_thresh == 0.98)
         assert(self.max_cond_frames_in_attn == -1)
         assert(self.memory_temporal_stride_for_eval == 1)
-        assert(self.max_obj_ptrs_in_encoder == 1 or self.max_obj_ptrs_in_encoder == 16)
+        assert(self.max_obj_ptrs_in_encoder == 16)
         assert(self.only_obj_ptrs_in_the_past_for_eval == True)
         assert(self.multimask_output_for_tracking == True)
         assert(self.use_multimask_token_for_obj_ptr == True)
+
+    def set_num_maskmem(self, num_maskmem, max_obj_ptrs_in_encoder):
+        self.num_maskmem = num_maskmem
+        self.max_obj_ptrs_in_encoder = max_obj_ptrs_in_encoder
+        assert(self.num_maskmem == 1 or self.num_maskmem == 7)
+        assert(self.max_obj_ptrs_in_encoder == 1 or self.max_obj_ptrs_in_encoder == 16)
 
     @property
     def device(self):

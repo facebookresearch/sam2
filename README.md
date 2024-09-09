@@ -23,6 +23,7 @@ tflite
 ```
 torch 2.4.0
 ai-edge-torch 0.2.0
+tf-nightly 2.18.0.dev20240905
 ```
 
 ## Export and Inference
@@ -63,15 +64,45 @@ python3 export_video_predictor.py --framework torch
 
 ## Artifacts
 
+The deliverables will be stored below.
+
 ```
 output/*
 model/*
 ```
 
+You can also download it from the following.
+
+### ONNX
+
+- https://storage.googleapis.com/ailia-models/segment-anything-2/image_encoder_hiera_t.onnx
+- https://storage.googleapis.com/ailia-models/segment-anything-2/prompt_encoder_hiera_t.onnx
+- https://storage.googleapis.com/ailia-models/segment-anything-2/mask_decoder_hiera_t.onnx
+- https://storage.googleapis.com/ailia-models/segment-anything-2/memory_encoder_hiera_t.onnx
+- https://storage.googleapis.com/ailia-models/segment-anything-2/memory_attention_hiera_t.onnx
+- https://storage.googleapis.com/ailia-models/segment-anything-2/mlp_hiera_t.onnx
+
+In addition, it is planned to update to use a 6-dimensional MatMul in MemoryAttention in the future.
+
+### TFLITE
+
+- https://storage.googleapis.com/ailia-models-tflite/segment-anything-2/image_encoder_hiera_t.tflite
+- https://storage.googleapis.com/ailia-models-tflite/segment-anything-2/mask_decoder_hiera_t.tflite
+- https://storage.googleapis.com/ailia-models-tflite/segment-anything-2/mlp_hiera_t.tflite
+- https://storage.googleapis.com/ailia-models-tflite/segment-anything-2/memory_attention_hiera_t.tflite
+- https://storage.googleapis.com/ailia-models-tflite/segment-anything-2/memory_encoder_hiera_t.tflite
+
+The memory attention in tflite does not support dynamic shapes, so num_maskmem and max_obj_ptrs_in_encoder need to be fixed to 1.
+
 ## Inference Example
+
+Image mode
 
 - [ailia-models](https://github.com/axinc-ai/ailia-models/tree/master/image_segmentation/segment-anything-2)
 - [ailia-models-tflite](https://github.com/axinc-ai/ailia-models-tflite/pull/90)
+
+Video mode
+- [ailia-models PR](https://github.com/axinc-ai/ailia-models/pull/1539)
 
 ## Original document
 

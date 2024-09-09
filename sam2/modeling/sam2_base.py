@@ -918,7 +918,7 @@ class SAM2Base(torch.nn.Module):
             #print("memory_pos_embed", memory_pos_embed.shape, memory_pos_embed.dtype)
             #print("num_obj_ptr_tokens", num_obj_ptr_tokens)
             torch.onnx.export(
-                self.memory_attention, (current_vision_feats[0], memory_1, memory_2, current_vision_pos_embeds[0], memory_pos_embed_1, memory_pos_embed_2), 'model/memory_attention_'+model_id+'.onnx',
+                self.memory_attention, (current_vision_feats[0], memory_1, memory_2, current_vision_pos_embeds[0], memory_pos_embed_1, memory_pos_embed_2), 'model/memory_attention_'+model_id+'.opt.onnx',
                 input_names=["curr", "memory_1", "memory_2", "curr_pos", "memory_pos_1", "memory_pos_2"],
                 output_names=["pix_feat"],
                 dynamic_axes={
@@ -939,7 +939,7 @@ class SAM2Base(torch.nn.Module):
             print("begin memory attention onnx")
             import onnxruntime
             if self.memory_attention_onnx == None:
-                self.memory_attention_onnx = onnxruntime.InferenceSession("model/memory_attention_"+model_id+".onnx")
+                self.memory_attention_onnx = onnxruntime.InferenceSession("model/memory_attention_"+model_id+".opt.onnx")
             import numpy as np
             #num_obj_ptr_tokens_numpy = np.array((num_obj_ptr_tokens)).astype(np.int64)
             #print("curr", np.sum(current_vision_feats[0].numpy()))

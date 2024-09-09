@@ -79,18 +79,18 @@ You can also download it from the following.
 - https://storage.googleapis.com/ailia-models/segment-anything-2/prompt_encoder_hiera_t.onnx
 - https://storage.googleapis.com/ailia-models/segment-anything-2/mask_decoder_hiera_t.onnx
 - https://storage.googleapis.com/ailia-models/segment-anything-2/memory_encoder_hiera_t.onnx
-- https://storage.googleapis.com/ailia-models/segment-anything-2/memory_attention_hiera_t.onnx
 - https://storage.googleapis.com/ailia-models/segment-anything-2/mlp_hiera_t.onnx
-
-In addition, it is planned to update to use a 6-dimensional MatMul in MemoryAttention in the future.
+- https://storage.googleapis.com/ailia-models/segment-anything-2/memory_attention_hiera_t.onnx (6dim matmul, batch = N)
+- https://storage.googleapis.com/ailia-models/segment-anything-2/memory_attention_hiera_t.opt.onnx (4dim matmul, batch = 1)
 
 ### TFLITE
 
 - https://storage.googleapis.com/ailia-models-tflite/segment-anything-2/image_encoder_hiera_t.tflite
+- https://storage.googleapis.com/ailia-models-tflite/segment-anything-2/prompt_encoder_hiera_t.tflite
 - https://storage.googleapis.com/ailia-models-tflite/segment-anything-2/mask_decoder_hiera_t.tflite
 - https://storage.googleapis.com/ailia-models-tflite/segment-anything-2/mlp_hiera_t.tflite
-- https://storage.googleapis.com/ailia-models-tflite/segment-anything-2/memory_attention_hiera_t.tflite
 - https://storage.googleapis.com/ailia-models-tflite/segment-anything-2/memory_encoder_hiera_t.tflite
+- https://storage.googleapis.com/ailia-models-tflite/segment-anything-2/memory_attention_hiera_t.tflite (4dim matmul, batch = 1, num_maskmem = 1)
 
 The memory attention in tflite does not support dynamic shapes, so num_maskmem and max_obj_ptrs_in_encoder need to be fixed to 1.
 

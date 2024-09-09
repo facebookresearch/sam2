@@ -305,20 +305,33 @@ class RoPEAttention(Attention):
     ):
         super().__init__(*args, **kwargs)
 
-        self.compute_cis = partial(
-            compute_axial_cis, dim=self.internal_dim // self.num_heads, theta=rope_theta
-        )
-        freqs_cis = self.compute_cis(end_x=feat_sizes[0], end_y=feat_sizes[1])
-        self.freqs_cis = freqs_cis
         self.rope_k_repeat = rope_k_repeat
 
         if USE_MAT_ROTARY_ENC:
             rotmats = get_rotation_matrices(dim=self.internal_dim // self.num_heads, end_x=feat_sizes[0], end_y=feat_sizes[1], theta=rope_theta)
             self.rotmats = rotmats
             self.rope_theta = rope_theta
+        else:
+            self.compute_cis = partial(
+                compute_axial_cis, dim=self.internal_dim // self.num_heads, theta=rope_theta
+            )
+            freqs_cis = self.compute_cis(end_x=feat_sizes[0], end_y=feat_sizes[1])
+            self.freqs_cis = freqs_cis
 
-    def forward(
-        self, q: Tensor, k: Tensor, v: Tensor, num_k_exclude_rope: int = 0
+    def allocate_rope_attention_weight(
+        self, q: Tensor
+    ):
+        # prepare weight of rope attention for dynamo export
+        w = h = math.sqrt(q.shape[-2])
+        if USE_MAT_ROTARY_ENC:
+            if self.rotmats.shape[2] != q.shape[-2]:
+                self.rotmats = get_rotation_matrices(dim=self.internal_dim // self.num_heads, end_x=w, end_y=h, theta=self.rope_theta)
+        else:
+            if self.freqs_cis.shape[0] != q.shape[-2]:
+                self.freqs_cis = self.compute_cis(end_x=w, end_y=h).to(q.device)
+
+    def self_attn(
+        self, q: Tensor, k: Tensor, v: Tensor
     ) -> Tensor:
         # Input projections
         q = self.q_proj(q)
@@ -331,32 +344,29 @@ class RoPEAttention(Attention):
         v = self._separate_heads(v, self.num_heads)
 
         # Apply rotary position encoding
-        w = h = math.sqrt(q.shape[-2])
+        #if USE_MAT_ROTARY_ENC:
+        #    #self.rotmats = self.rotmats.to(q.device)
+        #    if self.rotmats.shape[2] != q.shape[-2]:
+        #        raise("rotmat shape error " + str(self.rotmats.shape[2]) + " " + str(q.shape[-2]))
+        #else:
+        #    #self.freqs_cis = self.freqs_cis.to(q.device)
+        #    if self.freqs_cis.shape[0] != q.shape[-2]:
+        #        raise("freqs_cis shape error " + str(self.freqs_cis.shape[0]) + " " + str(q.shape[-2]))
 
-        self.freqs_cis = self.freqs_cis.to(q.device)
-        if self.freqs_cis.shape[0] != q.shape[-2]:
-            self.freqs_cis = self.compute_cis(end_x=w, end_y=h).to(q.device)
+        #if q.shape[-2] != k.shape[-2]:
+        #    assert self.rope_k_repeat
 
         if USE_MAT_ROTARY_ENC:
-            self.rotmats = self.rotmats.to(q.device)
-            if self.rotmats.shape[0] != q.shape[-2]:
-                self.rotmats = get_rotation_matrices(dim=self.internal_dim // self.num_heads, end_x=w, end_y=h, theta=self.rope_theta)
-
-        if q.shape[-2] != k.shape[-2]:
-            assert self.rope_k_repeat
-
-        num_k_rope = k.size(-2) - num_k_exclude_rope
-        if USE_MAT_ROTARY_ENC:
-            q, k[:, :, :num_k_rope] = apply_rotary_matenc(
+            q, k = apply_rotary_matenc(
                 q,
-                k[:, :, :num_k_rope],
+                k,
                 rotmats=self.rotmats,
                 repeat_freqs_k=self.rope_k_repeat,
             )
         else:
-            q, k[:, :, :num_k_rope] = apply_rotary_enc(
+            q, k = apply_rotary_enc(
                 q,
-                k[:, :, :num_k_rope],
+                k,
                 freqs_cis=self.freqs_cis,
                 repeat_freqs_k=self.rope_k_repeat,
             )
@@ -383,3 +393,82 @@ class RoPEAttention(Attention):
         out = self.out_proj(out)
 
         return out
+
+    def cross_attn(
+        self, q: Tensor, k_1: Tensor, v_1: Tensor, k_2: Tensor = None, v_2: Tensor = None
+    ) -> Tensor:
+        # Input projections
+        q = self.q_proj(q)
+        k_1 = self.k_proj(k_1)
+        v_1 = self.v_proj(v_1)
+        k_2 = self.k_proj(k_2)
+        v_2 = self.v_proj(v_2)
+
+        # Separate into heads
+        q = self._separate_heads(q, self.num_heads)
+        k_1 = self._separate_heads(k_1, self.num_heads)
+        v_1 = self._separate_heads(v_1, self.num_heads)
+        k_2 = self._separate_heads(k_2, self.num_heads)
+        v_2 = self._separate_heads(v_2, self.num_heads)
+
+        # Apply rotary position encoding
+        #if USE_MAT_ROTARY_ENC:
+        #    #self.rotmats = self.rotmats.to(q.device)
+        #    if self.rotmats.shape[2] != q.shape[-2]:
+        #        raise("rotmat shape error " + str(self.rotmats.shape[2]) + " " + str(q.shape[-2]))
+        #else:
+        #    #self.freqs_cis = self.freqs_cis.to(q.device)
+        #    if self.freqs_cis.shape[0] != q.shape[-2]:
+        #        raise("freqs_cis shape error " + str(self.freqs_cis.shape[0]) + " " + str(q.shape[-2]))
+
+        #if q.shape[-2] != k_1.shape[-2]:
+        #    assert self.rope_k_repeat
+
+        if USE_MAT_ROTARY_ENC:
+            q, k_1 = apply_rotary_matenc(
+                q,
+                k_1,
+                rotmats=self.rotmats,
+                repeat_freqs_k=self.rope_k_repeat,
+            )
+        else:
+            q, k_1 = apply_rotary_enc(
+                q,
+                k_1,
+                freqs_cis=self.freqs_cis,
+                repeat_freqs_k=self.rope_k_repeat,
+            )
+
+        #print(k_1.shape, k_2.shape)
+        #if k_2.shape[2] == 0:
+        #    k = k_1
+        #else:
+        k = torch.concat((k_1, k_2), dim = 2)
+        #if v_2.shape[2] == 0:
+        #    v = v_1
+        #else:
+        v = torch.concat((v_1, v_2), dim = 2)
+
+        dropout_p = self.dropout_p if self.training else 0.0
+        # Attention
+        #try:
+        #    with sdp_kernel_context(dropout_p):
+        #        out = F.scaled_dot_product_attention(q, k, v, dropout_p=dropout_p)
+        #except Exception as e:
+        if True:
+            # Fall back to all kernels if the Flash attention kernel fails
+            #warnings.warn(
+            #    f"Flash Attention kernel failed due to: {e}\nFalling back to all available "
+            #    f"kernels for scaled_dot_product_attention (which may have a slower speed).",
+            #    category=UserWarning,
+            #    stacklevel=2,
+            #)
+            global ALLOW_ALL_KERNELS
+            ALLOW_ALL_KERNELS = True
+            out = F.scaled_dot_product_attention(q, k, v, dropout_p=dropout_p)
+
+        out = self._recombine_heads(out)
+        out = self.out_proj(out)
+
+        return out
+    

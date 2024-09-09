@@ -50,6 +50,8 @@ from sam2.build_sam import build_sam2_video_predictor
 
 predictor = build_sam2_video_predictor(model_cfg, sam2_checkpoint, device=device)
 
+if export_to_tflite or import_from_tflite:
+    predictor.set_num_maskmem(num_maskmem=1, max_obj_ptrs_in_encoder=1)
 
 def show_mask(mask, ax, obj_id=None, random_color=False):
     if random_color:

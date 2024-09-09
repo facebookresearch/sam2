@@ -59,23 +59,19 @@ class MemoryAttentionLayer(nn.Module):
         # Self-Attention
         tgt2 = self.norm1(tgt)
         q = k = tgt2 + query_pos if self.pos_enc_at_attn else tgt2
-        tgt2 = self.self_attn(q, k, v=tgt2)
+        tgt2 = self.self_attn.self_attn(q, k = k, v = tgt2)
         tgt = tgt + self.dropout1(tgt2)
         return tgt
 
-    def _forward_ca(self, tgt, memory, query_pos, pos, num_k_exclude_rope=0):
-        kwds = {}
-        if num_k_exclude_rope > 0:
-            assert isinstance(self.cross_attn_image, RoPEAttention)
-            kwds = {"num_k_exclude_rope": num_k_exclude_rope}
-
+    def _forward_ca(self, tgt, memory_1, memory_2, query_pos, pos_1, pos_2):
         # Cross-Attention
         tgt2 = self.norm2(tgt)
-        tgt2 = self.cross_attn_image(
+        tgt2 = self.cross_attn_image.cross_attn(
             q=tgt2 + query_pos if self.pos_enc_at_cross_attn_queries else tgt2,
-            k=memory + pos if self.pos_enc_at_cross_attn_keys else memory,
-            v=memory,
-            **kwds,
+            k_1=memory_1 + pos_1 if self.pos_enc_at_cross_attn_keys else memory_1,
+            v_1=memory_1,
+            k_2=memory_2 + pos_2 if self.pos_enc_at_cross_attn_keys else memory_2,
+            v_2=memory_2
         )
         tgt = tgt + self.dropout2(tgt2)
         return tgt
@@ -83,15 +79,16 @@ class MemoryAttentionLayer(nn.Module):
     def forward(
         self,
         tgt,
-        memory,
-        pos: Optional[Tensor] = None,
+        memory_1,
+        memory_2,
+        pos_1: Optional[Tensor] = None,
+        pos_2: Optional[Tensor] = None,
         query_pos: Optional[Tensor] = None,
-        num_k_exclude_rope: int = 0,
     ) -> torch.Tensor:
 
         # Self-Attn, Cross-Attn
         tgt = self._forward_sa(tgt, query_pos)
-        tgt = self._forward_ca(tgt, memory, query_pos, pos, num_k_exclude_rope)
+        tgt = self._forward_ca(tgt, memory_1, memory_2, query_pos, pos_1, pos_2)
         # MLP
         tgt2 = self.norm3(tgt)
         tgt2 = self.linear2(self.dropout(self.activation(self.linear1(tgt2))))
@@ -116,13 +113,39 @@ class MemoryAttention(nn.Module):
         self.pos_enc_at_input = pos_enc_at_input
         self.batch_first = batch_first
 
+    def allocate_rope_attention_weight(
+        self,
+        curr: torch.Tensor,  # self-attention inputs
+        curr_pos: Optional[Tensor] = None,  # pos_enc for self-attention inputs
+    ):
+        if isinstance(curr, list):
+            assert isinstance(curr_pos, list)
+            assert len(curr) == len(curr_pos) == 1
+            curr, curr_pos = (
+                curr[0],
+                curr_pos[0],
+            )
+
+        output = curr
+
+        if self.batch_first:
+            # Convert to batch first
+            output = output.transpose(0, 1)
+
+        for layer in self.layers:
+            if isinstance(layer.cross_attn_image, RoPEAttention):
+                layer.cross_attn_image.allocate_rope_attention_weight(output)
+            if isinstance(layer.self_attn, RoPEAttention):
+                layer.self_attn.allocate_rope_attention_weight(output)
+
     def forward(
         self,
         curr: torch.Tensor,  # self-attention inputs
-        memory: torch.Tensor,  # cross-attention inputs
+        memory_1: torch.Tensor,  # cross-attention inputs
+        memory_2: torch.Tensor,  # cross-attention inputs
         curr_pos: Optional[Tensor] = None,  # pos_enc for self-attention inputs
-        memory_pos: Optional[Tensor] = None,  # pos_enc for cross-attention inputs
-        num_obj_ptr_tokens: int = 0,  # number of object pointer *tokens*
+        memory_pos_1: Optional[Tensor] = None,  # pos_enc for cross-attention inputs
+        memory_pos_2: Optional[Tensor] = None,  # pos_enc for cross-attention inputs
     ):
         if isinstance(curr, list):
             assert isinstance(curr_pos, list)
@@ -133,7 +156,7 @@ class MemoryAttention(nn.Module):
             )
 
         assert (
-            curr.shape[1] == memory.shape[1]
+            curr.shape[1] == memory_1.shape[1]
         ), "Batch size must be the same for curr and memory"
 
         output = curr
@@ -144,20 +167,18 @@ class MemoryAttention(nn.Module):
             # Convert to batch first
             output = output.transpose(0, 1)
             curr_pos = curr_pos.transpose(0, 1)
-            memory = memory.transpose(0, 1)
-            memory_pos = memory_pos.transpose(0, 1)
+            memory_1 = memory_1.transpose(0, 1)
+            memory_2 = memory_2.transpose(0, 1)
+            memory_pos_1 = memory_pos_1.transpose(0, 1)
+            memory_pos_2 = memory_pos_2.transpose(0, 1)
 
         for layer in self.layers:
-            kwds = {}
-            if isinstance(layer.cross_attn_image, RoPEAttention):
-                kwds = {"num_k_exclude_rope": num_obj_ptr_tokens}
-
             output = layer(
                 tgt=output,
-                memory=memory,
-                pos=memory_pos,
-                query_pos=curr_pos,
-                **kwds,
+                memory_1=memory_1,
+                memory_2=memory_2,
+                pos_1=memory_pos_1,
+                pos_2=memory_pos_2,
             )
         normed_output = self.norm(output)
 

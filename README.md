@@ -96,13 +96,8 @@ The memory attention in tflite does not support dynamic shapes, so num_maskmem a
 
 ## Inference Example
 
-Image mode
-
 - [ailia-models](https://github.com/axinc-ai/ailia-models/tree/master/image_segmentation/segment-anything-2)
 - [ailia-models-tflite](https://github.com/axinc-ai/ailia-models-tflite/pull/90)
-
-Video mode
-- [ailia-models PR](https://github.com/axinc-ai/ailia-models/pull/1539)
 
 ## Original document
 

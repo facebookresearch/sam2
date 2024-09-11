@@ -113,7 +113,7 @@ def main(args):
     # Parse the arguments
     args = parser.parse_args(args)
 
-    SAM2_path = "/lisc/scratch/neurobiology/zimmer/schaar/code/github/segment-anything-2"
+    SAM2_path = args.SAM2_path
 
     # Define paths relative to the base path
     checkpoint = os.path.join(SAM2_path , "checkpoints", "sam2_hiera_large.pt")

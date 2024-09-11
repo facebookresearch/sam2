@@ -18,6 +18,7 @@ import os
 import argparse
 import logging
 import tifffile as tiff
+import cv2
 
 
 def read_DLC_csv(csv_file_path):
@@ -100,6 +101,42 @@ def extract_coordinates(data, bodyparts):
             result[bodypart] = list(zip(x_values, y_values))
     return result
 
+
+def process_mask(mask):
+    """
+    Process the input mask to ensure it's in the proper format:
+    8-bit, single-channel binary image.
+    
+    Args:
+    mask (numpy.ndarray): Input mask image
+    
+    Returns:
+    numpy.ndarray: Processed binary mask
+    """
+    # Check the number of channels
+    if len(mask.shape) == 2:
+        # If it's already single channel
+        mask_single_channel = mask
+    elif len(mask.shape) == 3:
+        if mask.shape[2] == 3:
+            # If it's a 3-channel image, convert to grayscale
+            mask_single_channel = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+        elif mask.shape[2] == 4:
+            # If it's a 4-channel image (with alpha), convert to grayscale
+            mask_single_channel = cv2.cvtColor(mask, cv2.COLOR_BGRA2GRAY)
+        else:
+            raise ValueError(f"Unexpected number of channels: {mask.shape[2]}")
+    else:
+        raise ValueError(f"Unexpected shape of mask: {mask.shape}")
+
+    # Ensure 8-bit depth
+    mask_8bit = cv2.convertScaleAbs(mask_single_channel)
+
+    # Apply threshold to create binary mask
+    _, mask_binary = cv2.threshold(mask_8bit, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+
+    return mask_binary
+
 def main(args):
 
     # Parse command-line arguments
@@ -137,7 +174,6 @@ def main(args):
     DLC_csv_file_path = args.DLC_csv_file_path
     column_names = args.column_names
 
-    # TODO: Add your main logic here
     print(f"Input file: {input_file_path}")
     print(f"Output file: {output_file_path}")
     print(f"DLC CSV file: {DLC_csv_file_path}")
@@ -168,8 +204,10 @@ def main(args):
                 img = np.array(img)
 
                 mask = segment_object(img, [extracted_coordinates[column][i] for column in column_names], predictor)
+                
+                processed_mask = process_mask(mask)
 
-                tif_writer.write(mask, contiguous=True)
+                tif_writer.write(processed_mask, contiguous=True)
                 
                 logging.info(f"Successfully processed and wrote image {i+1}/{total_frames}")
 

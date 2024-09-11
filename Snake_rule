@@ -1,0 +1,21 @@
+
+rule sam2_segment:
+    input:
+        input_file = "{datasets_output}/../track.tif",
+        dlc_csv = "{datasets_output}/track"+config["network_string"]+".csv"
+    output:
+        output_file = "{datasets_output}/track_mask.btf"
+    params:
+        script_path = "/lisc/scratch/neurobiology/zimmer/schaar/code/github/segment-anything-2/sam2-segmentation_pipeline.py",
+        column_names = ["vulva", "neck"]
+        model_path = "/lisc/scratch/neurobiology/zimmer/schaar/code/github/segment-anything-2"
+    shell:
+        """
+        source /lisc/app/conda/miniconda3/bin/activate /lisc/scratch/neurobiology/zimmer/.conda/envs/SAM2_shared
+        python {params.script_path} \
+            {input.input_file} \
+            {output.output_file} \
+            {input.dlc_csv} \
+            {params.column_names} \
+            {params.model_path}
+        """

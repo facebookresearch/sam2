@@ -286,3 +286,17 @@ def apply_rotary_matenc(xq, xk, rotmats, repeat_freqs_k=False):
     #print("k_out", k_out.shape)
 
     return q_out, k_out
+
+
+def apply_rotary_matenc_512(xq, xk, rotmats, repeat_freqs_k=False):
+    bq, hq, nq, cq = xq.shape
+    q_rotmat = rotmats.reshape(1024, 128, 2, 2)
+    q_out = torch.matmul(q_rotmat, xq.reshape(nq, 128, 2, 1)).reshape(1, 1, 1024, 256)
+
+    bk, hk, nk, ck = xk.shape
+    k_rotmat = q_rotmat.repeat(nk // 1024, 1, 1, 1)
+    
+    bk, hk, nk, ck = xk.shape
+    k_in = xk.reshape(nk, 128, 2, 1)
+    k_out = torch.matmul(k_rotmat, k_in).reshape(1, 1, nk, 256)
+    return q_out, k_out

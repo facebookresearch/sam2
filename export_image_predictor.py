@@ -114,7 +114,7 @@ image = np.array(image.convert("RGB"))
 
 sam2_model = build_sam2(model_cfg, sam2_checkpoint, device=device, image_size=args.image_size)
 
-predictor = SAM2ImagePredictor(sam2_model, image_size = args.image_size)
+predictor = SAM2ImagePredictor(sam2_model)
 
 predictor.set_image(image, export_to_onnx = export_to_onnx_image_encoder,
                     export_to_tflite = export_to_tflite_image_encoder,

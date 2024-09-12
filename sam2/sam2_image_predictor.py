@@ -45,7 +45,7 @@ class SAM2ImagePredictor:
         super().__init__()
         self.model = sam_model
         self._transforms = SAM2Transforms(
-            resolution=image_size,
+            resolution=sam_model.image_size,
             mask_threshold=mask_threshold,
             max_hole_area=max_hole_area,
             max_sprinkle_area=max_sprinkle_area,
@@ -63,12 +63,10 @@ class SAM2ImagePredictor:
 
         # Spatial dim for backbone feature maps
         self._bb_feat_sizes = [
-            (image_size // 4, image_size // 4),
-            (image_size // 8, image_size // 8),
-            (image_size // 16, image_size // 16),
+            (sam_model.image_size // 4, sam_model.image_size // 4),
+            (sam_model.image_size // 8, sam_model.image_size // 8),
+            (sam_model.image_size // 16, sam_model.image_size // 16),
         ]
-
-        self.image_size = image_size
 
     @classmethod
     def from_pretrained(cls, model_id: str, **kwargs) -> "SAM2ImagePredictor":
@@ -501,7 +499,7 @@ class SAM2ImagePredictor:
         if concat_points is None:
             raise ("concat points must be exists") # Noneの場合はtensorサイズが0のテンソルを返さないといけないためwhereで組めない
         if mask_input is None:
-            mask_input_dummy = torch.Tensor(np.zeros((1, self.image_size // 4, self.image_size // 4)))
+            mask_input_dummy = torch.Tensor(np.zeros((1, self.model.image_size // 4, self.model.image_size // 4)))
             masks_enable = torch.tensor([0], dtype=torch.int) # boolだとonnxへのエクスポートのwhereでエラーになる
         else:
             mask_input_dummy = mask_input

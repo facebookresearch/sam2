@@ -15,7 +15,7 @@ import torch.nn.functional as F
 from torch import nn, Tensor
 
 from sam2.modeling.position_encoding import apply_rotary_enc, compute_axial_cis
-from sam2.modeling.position_encoding import apply_rotary_matenc, get_rotation_matrices
+from sam2.modeling.position_encoding import apply_rotary_matenc, get_rotation_matrices, apply_rotary_matenc_512
 from sam2.modeling.sam2_utils import MLP
 from sam2.utils.misc import get_sdpa_settings
 
@@ -317,6 +317,7 @@ class RoPEAttention(Attention):
             )
             freqs_cis = self.compute_cis(end_x=feat_sizes[0], end_y=feat_sizes[1])
             self.freqs_cis = freqs_cis
+        self.is_512 = feat_sizes[0] == 32
 
     def allocate_rope_attention_weight(
         self, q: Tensor
@@ -357,12 +358,20 @@ class RoPEAttention(Attention):
         #    assert self.rope_k_repeat
 
         if USE_MAT_ROTARY_ENC:
-            q, k = apply_rotary_matenc(
-                q,
-                k,
-                rotmats=self.rotmats,
-                repeat_freqs_k=self.rope_k_repeat,
-            )
+            if self.is_512:
+                q, k = apply_rotary_matenc_512(
+                    q,
+                    k,
+                    rotmats=self.rotmats,
+                    repeat_freqs_k=self.rope_k_repeat,
+                )
+            else:
+                q, k = apply_rotary_matenc(
+                    q,
+                    k,
+                    rotmats=self.rotmats,
+                    repeat_freqs_k=self.rope_k_repeat,
+                )
         else:
             q, k = apply_rotary_enc(
                 q,
@@ -425,12 +434,20 @@ class RoPEAttention(Attention):
         #    assert self.rope_k_repeat
 
         if USE_MAT_ROTARY_ENC:
-            q, k_1 = apply_rotary_matenc(
-                q,
-                k_1,
-                rotmats=self.rotmats,
-                repeat_freqs_k=self.rope_k_repeat,
-            )
+            if self.is_512:
+                q, k_1 = apply_rotary_matenc_512(
+                    q,
+                    k_1,
+                    rotmats=self.rotmats,
+                    repeat_freqs_k=self.rope_k_repeat,
+                )
+            else:
+                q, k_1 = apply_rotary_matenc(
+                    q,
+                    k_1,
+                    rotmats=self.rotmats,
+                    repeat_freqs_k=self.rope_k_repeat,
+                )
         else:
             q, k_1 = apply_rotary_enc(
                 q,

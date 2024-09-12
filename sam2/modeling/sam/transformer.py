@@ -317,10 +317,9 @@ class RoPEAttention(Attention):
             )
             freqs_cis = self.compute_cis(end_x=feat_sizes[0], end_y=feat_sizes[1])
             self.freqs_cis = freqs_cis
-        self.is_512 = feat_sizes[0] == 32
 
     def allocate_rope_attention_weight(
-        self, q: Tensor
+        self, q: Tensor, image_size
     ):
         # prepare weight of rope attention for dynamo export
         w = h = math.sqrt(q.shape[-2])
@@ -330,6 +329,7 @@ class RoPEAttention(Attention):
         else:
             if self.freqs_cis.shape[0] != q.shape[-2]:
                 self.freqs_cis = self.compute_cis(end_x=w, end_y=h).to(q.device)
+        self.is_512 = image_size == 512
 
     def self_attn(
         self, q: Tensor, k: Tensor, v: Tensor

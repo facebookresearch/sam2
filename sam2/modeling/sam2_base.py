@@ -900,6 +900,7 @@ class SAM2Base(torch.nn.Module):
         self.memory_attention.allocate_rope_attention_weight(
             curr=current_vision_feats,
             curr_pos=current_vision_pos_embeds,
+            image_size=self.image_size,
         )
 
         # 4096の倍数のRoPEAttentionが適用される部分と手協されない部分を事前に分割する

@@ -1,3 +1,29 @@
+# SAM 2 🤝 CoreML
+
+This repository contains the CoreML conversion of the Segment Anything Model 2
+(SAM 2) for image segmentation tasks. The converted models are optimized to run 
+efficiently on the Apple Neural Engine across a range of Apple devices.
+
+## Quick Start ⚡️ 
+
+### Installation
+First, clone the repository and install the dependencies:
+
+```bash
+git clone -b feature/SAM2 git@github.com:FL33TW00D/segment-anything-2.git && \
+cd segment-anything-2 && pip install -e . && \
+cd coreml && pip install -r requirements.txt
+```
+
+Next you can run the handy export script to convert the model to CoreML:
+```python
+python3 export.py --points '[[500,375]]' --labels '[1]' --variant Small --precision FLOAT16
+```
+For an integrated experience, you can also use [SAM2 Studio](https://github.com/huggingface/sam2-swiftui), a native MacOS app that allows you to quickly segment images. 
+
+> Note ⚠️: The CoreML conversion currently only supports image segmentation tasks. Video segmentation support is in development.
+---
+
 # SAM 2: Segment Anything in Images and Videos
 
 **[AI at Meta, FAIR](https://ai.meta.com/research/)**

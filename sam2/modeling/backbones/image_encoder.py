@@ -99,7 +99,6 @@ class FpnNeck(nn.Module):
         self.fpn_top_down_levels = list(fpn_top_down_levels)
 
     def forward(self, xs: List[torch.Tensor]):
-
         out = [None] * len(self.convs)
         pos = [None] * len(self.convs)
         assert len(xs) == len(self.convs)

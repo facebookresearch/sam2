@@ -87,7 +87,6 @@ try:
     from torch.utils.cpp_extension import BuildExtension
 
     class BuildExtensionIgnoreErrors(BuildExtension):
-
         def finalize_options(self):
             try:
                 super().finalize_options()

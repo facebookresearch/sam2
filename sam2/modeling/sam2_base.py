@@ -205,6 +205,7 @@ class SAM2Base(torch.nn.Module):
 
         # build PromptEncoder and MaskDecoder from SAM
         # (their hyperparameters like `mask_in_chans=16` are from SAM code)
+
         self.sam_prompt_encoder = PromptEncoder(
             embed_dim=self.sam_prompt_embed_dim,
             image_embedding_size=(
@@ -694,7 +695,9 @@ class SAM2Base(torch.nn.Module):
         if self.sigmoid_bias_for_mem_enc != 0.0:
             mask_for_mem = mask_for_mem + self.sigmoid_bias_for_mem_enc
         maskmem_out = self.memory_encoder(
-            pix_feat, mask_for_mem, skip_mask_sigmoid=True  # sigmoid already applied
+            pix_feat,
+            mask_for_mem,
+            skip_mask_sigmoid=True,  # sigmoid already applied
         )
         maskmem_features = maskmem_out["vision_features"]
         maskmem_pos_enc = maskmem_out["vision_pos_enc"]

@@ -21,7 +21,6 @@ def build_sam2(
     apply_postprocessing=True,
     **kwargs,
 ):
-
     if apply_postprocessing:
         hydra_overrides_extra = hydra_overrides_extra.copy()
         hydra_overrides_extra += [
@@ -79,7 +78,6 @@ def build_sam2_video_predictor(
 
 
 def build_sam2_hf(model_id, **kwargs):
-
     from huggingface_hub import hf_hub_download
 
     model_id_to_filenames = {
@@ -97,7 +95,6 @@ def build_sam2_hf(model_id, **kwargs):
 
 
 def build_sam2_video_predictor_hf(model_id, **kwargs):
-
     from huggingface_hub import hf_hub_download
 
     model_id_to_filenames = {

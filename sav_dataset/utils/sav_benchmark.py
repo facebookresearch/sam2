@@ -181,9 +181,9 @@ def _seg2bmap(seg, width=None, height=None):
     ar1 = float(width) / float(height)
     ar2 = float(w) / float(h)
 
-    assert not (
-        width > w | height > h | abs(ar1 - ar2) > 0.01
-    ), "Cannot convert %dx%d seg to %dx%d bmap." % (w, h, width, height)
+    assert not (width > w | height > h | abs(ar1 - ar2) > 0.01), (
+        "Cannot convert %dx%d seg to %dx%d bmap." % (w, h, width, height)
+    )
 
     e = np.zeros_like(seg)
     s = np.zeros_like(seg)

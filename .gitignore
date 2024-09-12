@@ -8,3 +8,6 @@ build/*
 _C.*
 outputs/*
 checkpoints/*.pt
+**/*.mlpackage
+**/*.npy
+.python-version

@@ -3,7 +3,7 @@
 
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
-
+import os
 import logging
 
 from typing import List, Optional, Tuple, Union
@@ -126,7 +126,88 @@ class SAM2ImagePredictor:
         ][::-1]
         self._features = {"image_embed": feats[-1], "high_res_feats": feats[:-1]}
         self._is_image_set = True
+
+        serialize_ground = os.environ.get("SERIALIZE_GROUND", False)
+        if serialize_ground:
+            image_embed = self._features["image_embed"].cpu().numpy()
+            high_res_feats = self._features["high_res_feats"]
+            feats_s0 = high_res_feats[0].cpu().numpy()
+            feats_s1 = high_res_feats[1].cpu().numpy()
+
+            np.save("image_embed.npy", image_embed)
+            np.save("feats_s0.npy", feats_s0)
+            np.save("feats_s1.npy", feats_s1)
+
         logging.info("Image embeddings computed.")
+
+    @torch.no_grad()
+    def encode_image_raw(self, prepared_image: torch.Tensor):
+        self.model.eval()
+        with torch.no_grad():
+            for _, param in self.model.named_parameters():
+                if param.requires_grad:
+                    param.requires_grad = False
+
+            backbone_out = self.model.forward_image(prepared_image)
+
+            _, vision_feats, _, _ = self.model._prepare_backbone_features(backbone_out)
+
+            if self.model.directly_add_no_mem_embed:
+                vision_feats[-1] = vision_feats[-1] + self.model.no_mem_embed
+
+            feats = [
+                feat.permute(1, 2, 0).view(1, -1, *feat_size)
+                for feat, feat_size in zip(
+                    vision_feats[::-1], self._bb_feat_sizes[::-1]
+                )
+            ][::-1]
+
+            image_embed = feats[-1]
+            high_res_feats = feats[:-1]
+            assert len(high_res_feats) == 2
+
+            feats_s0, feats_s1 = high_res_feats[0], high_res_feats[1]
+            return (image_embed, feats_s0, feats_s1)
+
+    @torch.no_grad()
+    def encode_points_raw(
+        self, unnorm_coords: torch.Tensor, labels: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        concat_points = (unnorm_coords, labels)
+        with torch.no_grad():
+            for _, param in self.model.named_parameters():
+                if param.requires_grad:
+                    param.requires_grad = False
+            (sparse_embeddings, dense_embeddings) = (
+                self.model.sam_prompt_encoder.points_only(points=concat_points)
+            )
+            return (sparse_embeddings, dense_embeddings)
+
+    @torch.no_grad()
+    def decode_masks_raw(
+        self,
+        image_embeddings: torch.Tensor,
+        sparse_embedding: torch.Tensor,
+        dense_embedding: torch.Tensor,
+        high_res_features: List[torch.Tensor],
+        multimask_output: bool = True,
+        batched_mode: bool = False,
+    ):
+        with torch.no_grad():
+            for _, param in self.model.sam_mask_decoder.named_parameters():
+                if param.requires_grad:
+                    param.requires_grad = False
+
+            low_res_masks, iou_scores, _, _ = self.model.sam_mask_decoder(
+                image_embeddings=image_embeddings,
+                image_pe=self.model.sam_prompt_encoder.get_dense_pe(),
+                sparse_prompt_embeddings=sparse_embedding,
+                dense_prompt_embeddings=dense_embedding,
+                multimask_output=multimask_output,
+                repeat_image=batched_mode,
+                high_res_features=high_res_features,
+            )
+            return low_res_masks, iou_scores
 
     @torch.no_grad()
     def set_image_batch(
@@ -305,7 +386,6 @@ class SAM2ImagePredictor:
     def _prep_prompts(
         self, point_coords, point_labels, box, mask_logits, normalize_coords, img_idx=-1
     ):
-
         unnorm_coords, labels, unnorm_box, mask_input = None, None, None, None
         if point_coords is not None:
             assert (
@@ -426,6 +506,10 @@ class SAM2ImagePredictor:
             repeat_image=batched_mode,
             high_res_features=high_res_features,
         )
+
+        if os.environ.get("SERIALIZE_GROUND", False):
+            low_res_masks_np = low_res_masks.cpu().numpy()
+            np.save("low_res_masks.npy", low_res_masks_np)
 
         # Upscale the masks to the original image resolution
         masks = self._transforms.postprocess_masks(

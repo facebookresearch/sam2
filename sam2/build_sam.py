@@ -19,6 +19,7 @@ def build_sam2(
     mode="eval",
     hydra_overrides_extra=[],
     apply_postprocessing=True,
+    image_size=1024,
     **kwargs,
 ):
 
@@ -32,6 +33,7 @@ def build_sam2(
         ]
     # Read config and init model
     cfg = compose(config_name=config_file, overrides=hydra_overrides_extra)
+    cfg.model.image_size = image_size
     OmegaConf.resolve(cfg)
     model = instantiate(cfg.model, _recursive_=True)
     _load_checkpoint(model, ckpt_path)

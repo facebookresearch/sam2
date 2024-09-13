@@ -154,7 +154,7 @@ class SAM2ImagePredictor:
             if not tflite_int8:
                 tfl_converter_flags = {'target_spec': {'supported_ops': [tf.lite.OpsSet.TFLITE_BUILTINS, tf.lite.OpsSet.SELECT_TF_OPS]}}
                 edge_model = ai_edge_torch.convert(self.model, sample_inputs, _ai_edge_converter_flags=tfl_converter_flags)
-                edge_model.export("image_encoder_"+model_id+".tflite")
+                edge_model.export("model/image_encoder_"+model_id+".tflite")
 
             if tflite_int8:
                 from ai_edge_torch.quantize import pt2e_quantizer
@@ -176,7 +176,7 @@ class SAM2ImagePredictor:
                     quant_config=quant_config.QuantConfig(pt2e_quantizer=quantizer),
                     _ai_edge_converter_flags=tfl_converter_flags
                 )
-                with_quantizer.export("image_encoder_"+model_id+"_int8.tflite")
+                with_quantizer.export("model/image_encoder_"+model_id+"_int8.tflite")
                 edge_model = model
 
             if import_from_tflite:
@@ -534,7 +534,7 @@ class SAM2ImagePredictor:
 
             if not tflite_int8:
                 edge_model = ai_edge_torch.convert(self.model.sam_prompt_encoder, sample_inputs)
-                edge_model.export("prompt_encoder_"+model_id+".tflite")
+                edge_model.export("model/prompt_encoder_"+model_id+".tflite")
 
             if False:#tflite_int8: # labelがint64で量子化できない
                 from ai_edge_torch.quantize import pt2e_quantizer
@@ -554,7 +554,7 @@ class SAM2ImagePredictor:
                     sample_inputs,
                     quant_config=quant_config.QuantConfig(pt2e_quantizer=quantizer),
                 )
-                with_quantizer.export("prompt_encoder_"+model_id+"_int8.tflite")
+                with_quantizer.export("model/prompt_encoder_"+model_id+"_int8.tflite")
 
                 edge_model = model
 
@@ -620,7 +620,7 @@ class SAM2ImagePredictor:
             if not tflite_int8:
                 import ai_edge_torch
                 edge_model = ai_edge_torch.convert(self.model.sam_mask_decoder, sample_inputs)
-                edge_model.export("mask_decoder_"+model_id+".tflite")
+                edge_model.export("model/mask_decoder_"+model_id+".tflite")
 
             if tflite_int8:
                 from ai_edge_torch.quantize import pt2e_quantizer
@@ -640,7 +640,7 @@ class SAM2ImagePredictor:
                     sample_inputs,
                     quant_config=quant_config.QuantConfig(pt2e_quantizer=quantizer),
                 )
-                with_quantizer.export("mask_decoder_"+model_id+"_int8.tflite")
+                with_quantizer.export("model/mask_decoder_"+model_id+"_int8.tflite")
 
                 edge_model = model
 

@@ -7,6 +7,7 @@ parser.add_argument('--model_id', default="hiera_t", choices=["hiera_l", "hiera_
 parser.add_argument('--framework', default="onnx", choices=["onnx", "tflite", "torch"])
 parser.add_argument('--accuracy', default="float", choices=["float", "int8"])
 parser.add_argument('--mode', default="both", choices=["both", "import", "export"])
+parser.add_argument('--image_size', default=1024, type=int, choices=[512, 1024])
 args = parser.parse_args()
 
 import os
@@ -43,12 +44,16 @@ elif model_id == "hiera_t":
 else:
     raise("unknown model type")
 
+# resolution settings
+if args.image_size == 512:
+    model_id = model_id + "_512"
+
 device = torch.device("cpu")
 print(f"using device: {device}")
 
 from sam2.build_sam import build_sam2_video_predictor
 
-predictor = build_sam2_video_predictor(model_cfg, sam2_checkpoint, device=device)
+predictor = build_sam2_video_predictor(model_cfg, sam2_checkpoint, device=device, image_size=args.image_size)
 
 if export_to_tflite or import_from_tflite:
     predictor.set_num_maskmem(num_maskmem=1, max_obj_ptrs_in_encoder=1)

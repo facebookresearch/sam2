@@ -566,7 +566,7 @@ class SAM2VideoPredictor(SAM2Base):
                 batch_size=batch_size,
                 high_res_masks=high_res_masks,
                 is_mask_from_pts=True,  # these frames are what the user interacted with
-                export_to_onnx=export_to_tflite,
+                export_to_onnx=export_to_onnx,
                 import_from_onnx=import_from_onnx,
                 export_to_tflite=export_to_tflite,
                 import_from_tflite=import_from_tflite,

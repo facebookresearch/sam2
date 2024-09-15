@@ -7,6 +7,7 @@ parser.add_argument('--model_id', default="hiera_t", choices=["hiera_l", "hiera_
 parser.add_argument('--framework', default="onnx", choices=["onnx", "tflite", "torch"])
 parser.add_argument('--accuracy', default="float", choices=["float", "int8"])
 parser.add_argument('--mode', default="both", choices=["both", "import", "export"])
+parser.add_argument('--image_size', default=1024, type=int, choices=[512, 1024])
 args = parser.parse_args()
 
 import os
@@ -52,6 +53,10 @@ elif model_id == "hiera_t":
 else:
     print("unknown model id")
     exit()
+
+# resolution settings
+if args.image_size == 512:
+    model_id = model_id + "_512"
 
 # use cpu for export
 device = torch.device("cpu")
@@ -107,7 +112,7 @@ def show_masks(image, masks, scores, point_coords=None, box_coords=None, input_l
 image = Image.open('notebooks/images/truck.jpg')
 image = np.array(image.convert("RGB"))
 
-sam2_model = build_sam2(model_cfg, sam2_checkpoint, device=device)
+sam2_model = build_sam2(model_cfg, sam2_checkpoint, device=device, image_size=args.image_size)
 
 predictor = SAM2ImagePredictor(sam2_model)
 

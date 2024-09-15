@@ -117,6 +117,7 @@ class MemoryAttention(nn.Module):
         self,
         curr: torch.Tensor,  # self-attention inputs
         curr_pos: Optional[Tensor] = None,  # pos_enc for self-attention inputs
+        image_size = 1024,
     ):
         if isinstance(curr, list):
             assert isinstance(curr_pos, list)
@@ -134,9 +135,9 @@ class MemoryAttention(nn.Module):
 
         for layer in self.layers:
             if isinstance(layer.cross_attn_image, RoPEAttention):
-                layer.cross_attn_image.allocate_rope_attention_weight(output)
+                layer.cross_attn_image.allocate_rope_attention_weight(output, image_size = image_size)
             if isinstance(layer.self_attn, RoPEAttention):
-                layer.self_attn.allocate_rope_attention_weight(output)
+                layer.self_attn.allocate_rope_attention_weight(output, image_size = image_size)
 
     def forward(
         self,

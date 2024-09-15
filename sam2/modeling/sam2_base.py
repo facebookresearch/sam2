@@ -204,7 +204,7 @@ class SAM2Base(torch.nn.Module):
         self.memory_encoder_onnx = None
 
         # Check decoder sample parameter
-        assert(self.image_size == 1024)
+        assert(self.image_size == 512 or self.image_size == 1024)
         assert(self.num_feature_levels == 3)
         assert(self.hidden_dim == 256)
         assert(self.num_maskmem == 7)
@@ -396,7 +396,7 @@ class SAM2Base(torch.nn.Module):
 
         if sam_mask_prompt is None:
             import numpy as np
-            mask_input_dummy = torch.Tensor(np.zeros((1, 256, 256)))
+            mask_input_dummy = torch.Tensor(np.zeros((1, self.image_size // 4, self.image_size // 4)))
             masks_enable = torch.tensor([0], dtype=torch.int)
         else:
             mask_input_dummy = sam_mask_prompt
@@ -507,7 +507,7 @@ class SAM2Base(torch.nn.Module):
             print("backbone_features", backbone_features.shape)
             if sam_mask_prompt is None:
                 import numpy as np
-                mask_input_dummy = torch.Tensor(np.zeros((1, 256, 256)))
+                mask_input_dummy = torch.Tensor(np.zeros((1, self.image_size // 4, self.image_size // 4)))
                 masks_enable = torch.tensor([0], dtype=torch.int)
             else:
                 mask_input_dummy = sam_mask_prompt
@@ -900,6 +900,7 @@ class SAM2Base(torch.nn.Module):
         self.memory_attention.allocate_rope_attention_weight(
             curr=current_vision_feats,
             curr_pos=current_vision_pos_embeds,
+            image_size=self.image_size,
         )
 
         # 4096の倍数のRoPEAttentionが適用される部分と手協されない部分を事前に分割する

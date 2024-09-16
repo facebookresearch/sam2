@@ -1,21 +1,22 @@
-
 rule sam2_segment:
     input:
-        input_file = "{datasets_output}/../track.tif",
-        dlc_csv = "{datasets_output}/track"+config["network_string"]+".csv"
+        input_file = "{datasets_output}raw_stack.btf",
+        dlc_csv = "{datasets_output}raw_stack_downsampled"+config["network_string"]+".csv" if (config["downsample_for_DLC"] == 1) else "{datasets_output}raw_stack"+config["network_string"]+".csv",
     output:
-        output_file = "{datasets_output}/track_mask.btf"
+        output_file = "{datasets_output}raw_stack_mask.btf",
     params:
-        script_path = "/lisc/scratch/neurobiology/zimmer/schaar/code/github/segment-anything-2/sam2-segmentation_pipeline.py",
-        column_names = ["vulva", "neck"]
-        model_path = "/lisc/scratch/neurobiology/zimmer/schaar/code/github/segment-anything-2"
+        script_path = "/lisc/scratch/neurobiology/zimmer/schaar/code/github/segment-anything-2/sam2-segmentation_pipeline_downsample_option.py",
+        column_names = ["pharynx"],
+        model_path = "/lisc/scratch/neurobiology/zimmer/schaar/code/github/segment-anything-2",
+        downsample_factor = 3.3125
     shell:
         """
         source /lisc/app/conda/miniconda3/bin/activate /lisc/scratch/neurobiology/zimmer/.conda/envs/SAM2_shared
         python {params.script_path} \
-            {input.input_file} \
-            {output.output_file} \
-            {input.dlc_csv} \
-            {params.column_names} \
-            {params.model_path}
+            -input_file_path {input.input_file} \
+            -output_file_path {output.output_file} \
+            -DLC_csv_file_path {input.dlc_csv} \
+            -column_names {params.column_names} \
+            -SAM2_path {params.model_path} \
+            --downsample_factor {params.downsample_factor}
         """

@@ -368,8 +368,6 @@ def main(args):
             global_frame_idx = out_frame_idx + (batch_number * batch_size)  # Adjust frame index to global frame count
             final_mask_dict[global_frame_idx] = binary_mask  # Store or update the mask for the global frame
 
-        break
-
     """
     Process and save the final mask dictionary into a TIFF file.
     """

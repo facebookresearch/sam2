@@ -185,13 +185,12 @@ def segment_object(predictor, video_path, coordinate, frame_number, batch_number
     
     print("Added point to the model")
 
-        # Dictionary to store masks for video frames
+    # Dictionary to store masks for video frames
     video_segments = {}
-    print("Propagating masklet through video frames:")
-    
-    for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(inference_state):
-        video_segments[out_frame_idx] = {}
-        
+    print("Propagating masklet through video frames (forward direction):")
+
+    # Forward propagation (reverse=False)
+    for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(inference_state, reverse=False):
         for i, out_obj_id in enumerate(out_obj_ids):
             # Generate mask from logits
             mask = (out_mask_logits[i] > 0.0).cpu().numpy()
@@ -205,18 +204,50 @@ def segment_object(predictor, video_path, coordinate, frame_number, batch_number
                 binary_mask = (mask * 255).astype(np.uint8)
                 
                 # Show unique values and shape of the binary mask
-                print(f"Binary mask for frame {out_frame_idx}, object {out_obj_id} has unique values: {np.unique(binary_mask)} and shape: {binary_mask.shape}")
+                print(f"Binary mask for frame {out_frame_idx} has unique values: {np.unique(binary_mask)} and shape: {binary_mask.shape}")
                 
-                # Add the binary mask to video_segments
-                video_segments[out_frame_idx][out_obj_id] = binary_mask
-                print(f"Processed frame {out_frame_idx}, object {out_obj_id}")
+                # Add the binary mask to video_segments (no second key, just out_frame_idx)
+                video_segments[out_frame_idx] = binary_mask
+                print(f"Processed frame {out_frame_idx}")
             else:
                 # Create a black mask (all zeros) with the same width and height as the original mask
-                black_mask = np.zeros((mask.shape[1], mask.shape[2]), dtype=np.uint8)
+                black_mask = np.zeros(mask.shape[1:], dtype=np.uint8)
                 
-                # Add the black mask to video_segments
-                video_segments[out_frame_idx][out_obj_id] = black_mask
-                print(f"Non-2D mask for frame {out_frame_idx}, object {out_obj_id}. Added black mask instead.")
+                # Add the black mask to video_segments (no second key)
+                video_segments[out_frame_idx] = black_mask
+                print(f"Non-2D mask for frame {out_frame_idx}. Added black mask instead.")
+
+    # Reverse propagation (reverse=True)
+    print("Propagating masklet through video frames (reverse direction):")
+    for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(inference_state, reverse=True):
+        for i, out_obj_id in enumerate(out_obj_ids):
+            # Generate mask from logits
+            mask = (out_mask_logits[i] > 0.0).cpu().numpy()
+
+            # Remove the extra channel dimension if present
+            mask = np.squeeze(mask)
+            
+            # Check if the mask is 2D (binary mask) and proceed
+            if len(mask.shape) == 2:
+                # Convert mask to binary (0 or 255)
+                binary_mask = (mask * 255).astype(np.uint8)
+                
+                # Show unique values and shape of the binary mask
+                print(f"Binary mask for frame {out_frame_idx} has unique values: {np.unique(binary_mask)} and shape: {binary_mask.shape}")
+                
+                # Add the binary mask to video_segments (no second key)
+                video_segments[out_frame_idx] = binary_mask
+                print(f"Processed frame {out_frame_idx}")
+            else:
+                # Create a black mask (all zeros) with the same width and height as the original mask
+                black_mask = np.zeros(mask.shape[1:], dtype=np.uint8)
+                
+                # Add the black mask to video_segments (no second key)
+                video_segments[out_frame_idx] = black_mask
+                print(f"Non-2D mask for frame {out_frame_idx}. Added black mask instead.")
+
+    # Sort the dictionary to ensure the frames are in proper order
+    video_segments = dict(sorted(video_segments.items()))
 
     return video_segments
 
@@ -314,7 +345,7 @@ def main(args):
     DLC_data = read_DLC_csv(DLC_csv_file_path)
 
     # Initialize a variable to hold the final concatenated mask
-    final_mask_array = None
+    final_mask_dict = {}
 
     for batch_number, _ in batch_frame_count:
         # Directory for the current batch of frames
@@ -330,36 +361,36 @@ def main(args):
         print(f"Generating masklet for batch {batch_number}")
 
         masks = segment_object(predictor, batch_dir, coordinates, frame_number, batch_number, batch_size)
-        print(f"Masklet generated for batch {batch_number}. Number of masks: {len(masks)}")
+        print(f"Masklet generated for batch {batch_number}. Number of masks: {len(masks)}. Stored masks: {list(masks.keys())}")
 
+         # Concatenate masks into the final dictionary with global frame indexing
+        for out_frame_idx, binary_mask in masks.items():
+            global_frame_idx = out_frame_idx + (batch_number * batch_size)  # Adjust frame index to global frame count
+            final_mask_dict[global_frame_idx] = binary_mask  # Store or update the mask for the global frame
 
-        # Initialize final_mask_array as an empty dictionary
-        if final_mask_array is None:
-            final_mask_array = {}
-
-        # Iterate through the masks dictionary and concatenate masks per object ID
-        for obj_id, mask in masks.items():
-            if obj_id not in final_mask_array:
-                # Initialize the mask list for this object ID
-                final_mask_array[obj_id] = mask
-            else:
-                # Concatenate the mask along the first axis (assuming it's time or batch axis)
-                final_mask_array[obj_id] = np.concatenate((final_mask_array[obj_id], mask), axis=0)
-        
-        # Break the loop after the first iteration for testing
         break
 
-    print("All batches processed and concatenated into a single array.")
+    """
+    Process and save the final mask dictionary into a TIFF file.
+    """
+    # Sort the dictionary by the global frame index (just in case)
+    sorted_mask_keys = sorted(final_mask_dict.keys())
 
-
-    # Write the processed mask to the TIFF file
     with tiff.TiffWriter(output_file_path, bigtiff=True) as tif_writer:
-        for img in final_mask_array:
-            img = np.array(img)
-            #processed_mask = process_mask(img)
-            tif_writer.write(img, contiguous=True)
+        for global_frame_idx in sorted_mask_keys:
+            mask = final_mask_dict[global_frame_idx]
+            
+            # Process the mask (e.g., convert to binary, 8-bit)
+            processed_mask = process_mask(mask)
+            print(f"Saving mask for global frame {global_frame_idx} with shape: {processed_mask.shape}")
 
-    print(f"Batch {batch_number} processed and saved.")
+            # Ensure the mask is not empty before saving
+            if np.any(processed_mask):
+                tif_writer.write(processed_mask, contiguous=True)
+            else:
+                print(f"Warning: Mask for global frame {global_frame_idx} is empty, skipping.")
+    
+    print(f"All masks saved to {output_file_path}.")
 
 if __name__ == "__main__":
      main(sys.argv[1:])  # exclude the script name from the args when called from sh

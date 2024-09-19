@@ -46,6 +46,10 @@ def read_DLC_csv(csv_file_path):
     df = df.drop(df.columns[0], axis=1)
     df = df.reset_index(drop=True)
 
+    # Convert each column to numeric, coerce errors to NaN
+    for col in df.columns:
+        df[col] = pd.to_numeric(df[col], errors='coerce')
+
     print(isinstance(df.columns, pd.MultiIndex))
     print(list(df.columns))
 

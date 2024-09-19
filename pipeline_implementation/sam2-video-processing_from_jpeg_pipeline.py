@@ -1,9 +1,12 @@
+import os
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:true"
+
 import torch
 
-# Check if CUDA is available and display the GPU information
+# The rest of your script continues here
 if torch.cuda.is_available():
     gpu_count = torch.cuda.device_count()
-    for i in range(gpu_count):
+    for i in gpu_count:
         print(f"CUDA is available. Using GPU {i}: {torch.cuda.get_device_name(i)}")
 else:
     print("CUDA is not available. Using CPU.")
@@ -14,7 +17,6 @@ import pandas as pd
 from imutils.scopereader import MicroscopeDataReader
 import dask.array as da
 import sys
-import os
 import argparse
 import logging
 import tifffile as tiff
@@ -83,10 +85,10 @@ def extract_coordinate_by_likelihood(df, bodyparts):
             x_values = pd.to_numeric(selected_row[bodypart]['x'], errors='coerce')
             y_values = pd.to_numeric(selected_row[bodypart]['y'], errors='coerce')
             result[bodypart] = list(zip(x_values, y_values))
+    
+    return result, selected_index
 
-    return result
-
-def create_frames_directory(video_path, max_frames=100):
+def create_frames_directory(video_path):
     video_dir = os.path.dirname(video_path)
     frames_dir = os.path.join(video_dir, 'frame_directory')
     os.makedirs(frames_dir, exist_ok=True)
@@ -97,20 +99,19 @@ def create_frames_directory(video_path, max_frames=100):
         raise ValueError(f"Error opening video file: {video_path}")
     
     total_frames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
-    frame_step = max(1, total_frames // max_frames)
     
     frame_count = 0
     saved_count = 0
-    while saved_count < max_frames:
+    
+    while True:
         ret, frame = video.read()
         if not ret:
             break
         
-        if frame_count % frame_step == 0:
-            frame_filename = os.path.join(frames_dir, f"{saved_count:05d}.jpg")
-            cv2.imwrite(frame_filename, frame)
-            saved_count += 1
-            print(f"Saved frame {saved_count}/{max_frames}")
+        frame_filename = os.path.join(frames_dir, f"{saved_count:05d}.jpg")
+        cv2.imwrite(frame_filename, frame)
+        saved_count += 1
+        print(f"Saved frame {saved_count}/{total_frames}")
         
         frame_count += 1
     
@@ -119,13 +120,28 @@ def create_frames_directory(video_path, max_frames=100):
     print(f"Extracted {saved_count} frames to {frames_dir} (from total {total_frames} frames)")
     return frames_dir
 
-import numpy as np
 
-def generate_masklet(predictor, video_path, coordinate, frame_number):
+def segment_object(predictor, video_path, coordinate, frame_number):
     print(f"Generating masklet for coordinate {coordinate} on frame {frame_number}")
-    x, y = coordinate
-    points = np.array([[x, y]], dtype=np.float32)
-    labels = np.array([1], dtype=np.int32)
+
+     # Initialize lists to hold points and labels
+    points_list = []
+    labels_list = []
+    
+    # Iterate over each key (e.g., 'vulva', 'neck') in the coordinate dictionary
+    for key in coordinate:
+        # Iterate over each (x, y) tuple in the list associated with the key
+        for (x, y) in coordinate[key]:
+            points_list.append([x, y])
+            labels_list.append(1)  # You can customize the label as needed
+
+    # Convert the lists to NumPy arrays
+    points = np.array(points_list, dtype=np.float32)
+    labels = np.array(labels_list, dtype=np.int32)
+    
+    # Now you can use 'points' and 'labels' as needed
+    print("Points array:", points)
+    print("Labels array:", labels)
 
     # Initialize inference state
     inference_state = predictor.init_state(video_path=video_path)
@@ -177,41 +193,59 @@ def generate_masklet(predictor, video_path, coordinate, frame_number):
 
     return video_segments
 
-
-def save_masklet(frames_dir, video_segments):
-    print("Saving binary masklet images")
-    output_dir = os.path.join(frames_dir, 'output_binary')
-    os.makedirs(output_dir, exist_ok=True)
+def process_mask(mask):
+    """
+    Process the input mask to ensure it's in the proper format:
+    8-bit, single-channel binary image.
     
-    for frame_idx, masks in video_segments.items():
-        for obj_id, mask in masks.items():
-            
-            # Check if the mask is empty or not in expected format
-            if mask is None or mask.size == 0:
-                print(f"Warning: mask for frame {frame_idx} and object {obj_id} is empty or None. Skipping.")
-                continue
-
-            # Ensure mask is in the correct format (uint8)
-            if mask.dtype != np.uint8:
-                mask = mask.astype(np.uint8)
-
-            # Check mask dimensions (ensure it's 2D for binary mask)
-            if len(mask.shape) == 2:  # Assuming it's a binary mask (grayscale)
-                output_path = os.path.join(output_dir, f"binary_masklet_frame_{frame_idx:05d}_obj_{obj_id}.png")
-                cv2.imwrite(output_path, mask)
-            else:
-                print(f"Warning: mask for frame {frame_idx} and object {obj_id} has an unexpected shape {mask.shape}. Skipping.")
-
-        print(f"Saved binary masklet for frame {frame_idx}")
+    Args:
+    mask (numpy.ndarray): Input mask image
     
-    print(f"Saved all binary masklet images to {output_dir}")
+    Returns:
+    numpy.ndarray: Processed binary mask
+    """
+    # Check the number of channels
+    if len(mask.shape) == 2:
+        # If it's already single channel
+        mask_single_channel = mask
+    elif len(mask.shape) == 3:
+        if mask.shape[2] == 3:
+            # If it's a 3-channel image, convert to grayscale
+            mask_single_channel = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+        elif mask.shape[2] == 4:
+            # If it's a 4-channel image (with alpha), convert to grayscale
+            mask_single_channel = cv2.cvtColor(mask, cv2.COLOR_BGRA2GRAY)
+        else:
+            raise ValueError(f"Unexpected number of channels: {mask.shape[2]}")
+    else:
+        raise ValueError(f"Unexpected shape of mask: {mask.shape}")
+
+    # Ensure 8-bit depth
+    mask_8bit = cv2.convertScaleAbs(mask_single_channel)
+
+    # Apply threshold to create binary mask
+    _, mask_binary = cv2.threshold(mask_8bit, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+
+    return mask_binary
     
     
-def main():
+def main(args):
+
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(description="Process input files and generate output.")
+    parser.add_argument("-video_path", type=str, help="Path to the input file")
+    parser.add_argument("-output_file_path", type=str, help="Path to the output file")
+    parser.add_argument("-DLC_csv_file_path", type=str, help="Path to the DLC CSV file")
+    parser.add_argument("-column_names", type=str, nargs='+', help="List of column names")
+    parser.add_argument("-SAM2_path", type=str, help="Location of GitRepo!")
+    parser.add_argument("--downsample_factor", type=float, default=0, help="Use in case DLC was used on downsampled video (default: 0)")
+
+    # Parse the arguments
+    args = parser.parse_args(args)
     
     print("Starting SAM2 Video Processing")
     
-    SAM2_path = "/lisc/scratch/neurobiology/zimmer/schaar/code/github/segment-anything-2"
+    SAM2_path = args.SAM2_path
 
     # Define paths relative to the base path
     checkpoint = os.path.join(SAM2_path , "checkpoints", "sam2_hiera_large.pt")
@@ -223,30 +257,47 @@ def main():
     if not os.path.exists(model_cfg):
         raise FileNotFoundError(f"Config file not found: {model_cfg}")
     
-    coordinate = (74, 96)
-    frame_number = 10
-
-    video_path = "/lisc/scratch/neurobiology/zimmer/schaar/Behavior/High_Res_Population/110620024/test_SAM2/2024-06-10_14-58-26_trainingsdata_clean3/2024-06-10_14-58-26_trainingsdata_clean3_track_0/output/track.avi"
-
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
-
-    print("Extracting frames from video")
-    frames_dir = create_frames_directory(video_path, max_frames=100)
+    
+    from sam2.build_sam import build_sam2_video_predictor
 
     print("Loading SAM2 model")
     predictor = build_sam2_video_predictor(model_cfg, checkpoint, device=device)
     
+    # Access the parsed arguments
+    video_path = args.video_path
+    output_file_path = args.output_file_path
+    DLC_csv_file_path = args.DLC_csv_file_path
+    column_names = args.column_names
+    downsample_factor = args.downsample_factor
+
+    print(f"Video File: {video_path}")
+    print(f"Output file: {output_file_path}")
+    print(f"DLC CSV file: {DLC_csv_file_path}")
+    print(f"Column names: {column_names}")
+    
+    DLC_data = read_DLC_csv(DLC_csv_file_path)
+
+    coordinates, frame_number = extract_coordinate_by_likelihood(DLC_data, column_names)
+
+    print("Extracting frames from video")
+    frames_dir = create_frames_directory(video_path)
+    
     print("Generating masklet")
-    video_segments = generate_masklet(predictor, frames_dir, coordinate, frame_number)
-    
+    masks = segment_object(predictor, frames_dir, coordinates, frame_number)
     print("Masklet generated across the video.")
-    
-    print("Saving masklet images")
-    save_masklet(frames_dir, video_segments)
-    
-    print("Processing complete")
-    return video_segments
+
+    processed_mask = process_mask(mask)
+    print("Postprocessing complete")
+
+    with tiff.TiffWriter(output_file_path, bigtiff=True) as tif_writer:
+        total_frames = len(processed_mask)
+        for i, img in enumerate(processed_mask):
+            img = np.array(img)
+
+            tif_writer.write(img, contiguous=True)
+                
 
 if __name__ == "__main__":
-    main()
+     main(sys.argv[1:])  # exclude the script name from the args when called from sh

@@ -369,7 +369,7 @@ def main(args):
     DLC_data = read_DLC_csv(DLC_csv_file_path)
 
     if downsample_factor != 0:
-    DLC_data = multiply_columns_by_downsample_factor(DLC_data, downsample_factor)
+        DLC_data = multiply_columns_by_downsample_factor(DLC_data, downsample_factor)
     
 
     # Initialize a variable to hold the final concatenated mask

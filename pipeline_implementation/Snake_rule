@@ -1,22 +1,24 @@
 rule sam2_segment:
     input:
-        input_file = "{datasets_output}raw_stack.btf",
-        dlc_csv = "{datasets_output}raw_stack_downsampled"+config["network_string"]+".csv" if (config["downsample_for_DLC"] == 1) else "{datasets_output}raw_stack"+config["network_string"]+".csv",
+        avi_path = "Path to the uncompressed AVI video file according to your Snakemake definition",
+        dlc_csv = "Path to the corresponding DLC CSV tracking file, either downsampled or full according to configuration",
     output:
-        output_file = "{datasets_output}raw_stack_mask.btf",
+        output_file = "Path to the output file btf stack according to your snake workflow",
     params:
-        script_path = "/lisc/scratch/neurobiology/zimmer/schaar/code/github/segment-anything-2/sam2-segmentation_pipeline_downsample_option.py",
-        column_names = ["pharynx"],
-        model_path = "/lisc/scratch/neurobiology/zimmer/schaar/code/github/segment-anything-2",
-        downsample_factor = 3.3125
+        script_path = "/lisc/scratch/neurobiology/zimmer/autoscope/code/segment-anything-2/pipeline_implementation/sam2-video-processing_from_jpeg_batch_pipeline.py"
+        column_names = ["pharynx", "other"] -> coordinate inside the worm, can be one or many
+        model_path = "/lisc/scratch/neurobiology/zimmer/autoscope/code/segment-anything-2"
+        downsample_factor = 0 -> Downsample factor for video processing if used (default 0)
+        batch_size = 2000 -> Batch size for processing video frames, can be finetuned to your data resolution (L40s GPUs have 48 GB memory)
     shell:
         """
         source /lisc/app/conda/miniconda3/bin/activate /lisc/scratch/neurobiology/zimmer/.conda/envs/SAM2_shared
         python {params.script_path} \
-            -input_file_path {input.input_file} \
+            -video_path {input.avi_path} \
             -output_file_path {output.output_file} \
             -DLC_csv_file_path {input.dlc_csv} \
             -column_names {params.column_names} \
             -SAM2_path {params.model_path} \
-            --downsample_factor {params.downsample_factor}
+            --downsample_factor {params.downsample_factor} \
+            --batch_size {params.batch_size}
         """

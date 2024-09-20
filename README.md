@@ -1,3 +1,5 @@
+# Check Subfolder /pipeline_implementation for Read_Me.md file of Snakemake Implementation!
+
 # SAM 2: Segment Anything in Images and Videos
 
 **[AI at Meta, FAIR](https://ai.meta.com/research/)**

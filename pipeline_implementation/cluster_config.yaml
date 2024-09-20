@@ -1,0 +1,6 @@
+sam2_segment:
+    time: 0-12:00:00
+    partition: gpu
+    mem: 128G
+    gres: shard:l40s:640
+

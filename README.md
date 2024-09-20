@@ -1,3 +1,6 @@
+# Custom Implementation:
+Check Subfolder /pipeline_implementation for Read_Me.md file!
+
 # SAM 2: Segment Anything in Images and Videos
 
 **[AI at Meta, FAIR](https://ai.meta.com/research/)**

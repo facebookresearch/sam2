@@ -1,4 +1,4 @@
-# Check Subfolder /pipeline_implementation for Read_Me.md file!
+# Check Subfolder /pipeline_implementation for Read_Me.md file for Snakemake Implementation!
 
 # SAM 2: Segment Anything in Images and Videos
 

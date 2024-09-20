@@ -19,6 +19,7 @@ import argparse
 import logging
 import tifffile as tiff
 import cv2
+import shutil
 
 def read_DLC_csv(csv_file_path):
 
@@ -85,6 +86,15 @@ def extract_coordinate_by_likelihood(df, bodyparts):
             result[bodypart] = list(zip(x_values, y_values))
     
     return result, selected_index
+
+def multiply_columns_by_downsample_factor(DLC_data, downsample_factor):
+    # Iterate over each column in the DataFrame
+    for col in DLC_data.columns:
+        # Check if the second level of the column name is 'x' or 'y'
+        if col[1] in ['x', 'y']:
+            # Multiply the column values by the downsample_factor
+            DLC_data[col] *= downsample_factor
+    return DLC_data
 
 def create_frames_directory(video_path, batch_size):
     video_dir = os.path.dirname(video_path)
@@ -286,7 +296,21 @@ def process_mask(mask):
 
     return mask_binary
 
-    
+
+def clear_temp_folder(frames_dir):
+    """
+    Deletes the temporary folder containing the batch frames after processing is complete.
+
+    Args:
+    frames_dir (str): The path to the directory containing batch frames.
+    """
+    try:
+        # Remove the entire directory tree at frames_dir
+        shutil.rmtree(frames_dir)
+        print(f"Temporary folder '{frames_dir}' has been deleted successfully.")
+    except Exception as e:
+        print(f"Error deleting temporary folder '{frames_dir}': {str(e)}")
+
     
 def main(args):
 
@@ -344,6 +368,10 @@ def main(args):
 
     DLC_data = read_DLC_csv(DLC_csv_file_path)
 
+    if downsample_factor != 0:
+    DLC_data = multiply_columns_by_downsample_factor(DLC_data, downsample_factor)
+    
+
     # Initialize a variable to hold the final concatenated mask
     final_mask_dict = {}
 
@@ -389,6 +417,9 @@ def main(args):
                 print(f"Warning: Mask for global frame {global_frame_idx} is empty, skipping.")
     
     print(f"All masks saved to {output_file_path}.")
+
+    # After everything is finished, delete the temporary folder
+    clear_temp_folder(frames_dir)
 
 if __name__ == "__main__":
      main(sys.argv[1:])  # exclude the script name from the args when called from sh

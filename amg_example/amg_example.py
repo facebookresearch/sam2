@@ -56,6 +56,14 @@ sam2.to(device=device)
 
 mask_generator = SAM2AutomaticMaskGenerator(sam2)
 
+mask_generator.predictor._predict = torch.compile(
+    mask_generator.predictor._predict,
+    mode="max-autotune",
+    fullgraph=True,
+    dynamic=False,
+)
+
+
 # Run thrice for warmup
 masks = mask_generator.generate(image)
 masks = mask_generator.generate(image)

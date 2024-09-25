@@ -23,11 +23,14 @@ def show_anns(anns):
 
     img = np.ones((sorted_anns[0]['segmentation'].shape[0], sorted_anns[0]['segmentation'].shape[1], 4))
     img[:,:,3] = 0
+    ms = []
     for ann in sorted_anns:
         m = ann['segmentation']
+        ms.append(torch.as_tensor(m))
         color_mask = np.concatenate([np.random.random(3), [0.35]])
         img[m] = color_mask
     ax.imshow(img)
+    return torch.stack(ms)
 
 image = cv2.imread('dog.jpg')
 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -61,7 +64,11 @@ masks = mask_generator.generate(image)
 # Save an example
 plt.figure(figsize=(image.shape[1]/100., image.shape[0]/100.), dpi=100)
 plt.imshow(image)
-show_anns(masks)
+ms = show_anns(masks)
+ms_ref = torch.load("dog_mask_fast.pt")
+torch.testing.assert_allclose(ms, ms_ref)
+print("Masks match reference")
+# torch.save(ms, "dog_mask_fast.pt")
 plt.axis('off')
 plt.tight_layout()
 plt.savefig('dog_mask_fast.png', format='png')

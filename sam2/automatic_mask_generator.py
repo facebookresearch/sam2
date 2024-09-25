@@ -312,12 +312,13 @@ class SAM2AutomaticMaskGenerator:
         in_labels = torch.ones(
             in_points.shape[0], dtype=torch.int, device=in_points.device
         )
-        masks, iou_preds, low_res_masks = self.predictor._predict(
-            in_points[:, None, :],
-            in_labels[:, None],
-            multimask_output=self.multimask_output,
-            return_logits=True,
-        )
+        with torch.autograd.profiler.record_function("_predict"):
+            masks, iou_preds, low_res_masks = self.predictor._predict(
+                in_points[:, None, :],
+                in_labels[:, None],
+                multimask_output=self.multimask_output,
+                return_logits=True,
+            )
 
         # Serialize predictions and store in MaskData
         data = MaskData(

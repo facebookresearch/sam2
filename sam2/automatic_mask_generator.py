@@ -24,6 +24,7 @@ from sam2.utils.amg import (
     generate_crop_boxes,
     is_box_near_crop_edge,
     mask_to_rle_pytorch,
+    mask_to_rle_pytorch_2,
     MaskData,
     remove_small_regions,
     rle_to_mask,
@@ -378,7 +379,7 @@ class SAM2AutomaticMaskGenerator:
 
         # Compress to RLE
         data["masks"] = uncrop_masks(data["masks"], crop_box, orig_h, orig_w)
-        data["rles"] = mask_to_rle_pytorch(data["masks"])
+        data["rles"] = mask_to_rle_pytorch_2(data["masks"])
         del data["masks"]
 
         return data

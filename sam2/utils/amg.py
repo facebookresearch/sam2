@@ -105,6 +105,42 @@ def batch_iterator(batch_size: int, *args) -> Generator[List[Any], None, None]:
     for b in range(n_batches):
         yield [arg[b * batch_size : (b + 1) * batch_size] for arg in args]
 
+def mask_to_rle_pytorch_2(tensor: torch.Tensor) -> List[Dict[str, Any]]:
+    """
+    Encodes masks to an uncompressed RLE, in the format expected by
+    pycoco tools.
+    """
+    # Put in fortran order and flatten h,w
+    b, h, w = tensor.shape
+    tensor = tensor.permute(0, 2, 1).flatten(1)
+
+    # Compute change indices
+    diff = tensor[:, 1:] ^ tensor[:, :-1]
+    a = torch.tensor([[True]])
+    if diff.is_cuda:
+        a = a.pin_memory().cuda()
+    a = a.expand_as(diff.narrow(1, 0, 1))
+    diff = torch.cat([a, diff, a], dim=1)
+    change_indices = diff.nonzero()
+
+    alt_lens = diff.sum(dim=1).tolist()
+
+    all_cur_idx = change_indices[:, 1]
+    all_btw_idx = torch.cat([all_cur_idx[1:], all_cur_idx[:1]]) - all_cur_idx
+    all_btw_idx = all_btw_idx.detach().cpu().tolist()
+
+    # Encode run length
+    out = []
+    counts_init = (tensor[:, 0] == 0).tolist()
+    offset = 0
+    for i, ci in zip(range(b), counts_init):
+        btw_idxs = all_btw_idx[offset:offset + alt_lens[i]][:-1]
+        offset += alt_lens[i]
+        counts = [] if ci else [0]
+        counts.extend(btw_idxs)
+        out.append({"size": [h, w], "counts": counts})
+
+    return out
 
 def mask_to_rle_pytorch(tensor: torch.Tensor) -> List[Dict[str, Any]]:
     """

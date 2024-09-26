@@ -398,7 +398,8 @@ class SAM2AutomaticMaskGenerator:
     ) -> List[MaskData]:
         orig_h, orig_w = orig_size
 
-        datas = []
+        in_pointss = []
+        in_labelss = []
         for points in pointss:
             in_points = self.predictor._transforms.transform_coords(
                 points, normalize=normalize, orig_hw=im_size
@@ -406,6 +407,13 @@ class SAM2AutomaticMaskGenerator:
             in_labels = torch.ones(
                 in_points.shape[0], dtype=torch.int, device=in_points.device
             )
+            in_pointss.append(in_points)
+            in_labelss.append(in_labels)
+
+        maskss = []
+        iou_predss = []
+        low_res_maskss = []
+        for (in_points, in_labels) in zip(in_pointss, in_labelss):
             with torch.autograd.profiler.record_function("_predict"):
                 masks, iou_preds, low_res_masks = self.predictor._predict(
                     in_points[:, None, :],
@@ -413,7 +421,12 @@ class SAM2AutomaticMaskGenerator:
                     multimask_output=self.multimask_output,
                     return_logits=True,
                 )
+            maskss.append(masks)
+            iou_predss.append(iou_preds)
+            low_res_maskss.append(low_res_masks)
 
+        datas = []
+        for (masks, iou_preds, low_res_masks) in zip(maskss, iou_predss, low_res_maskss):
             # Serialize predictions and store in MaskData
             data = MaskData(
                 masks=masks.flatten(0, 1),

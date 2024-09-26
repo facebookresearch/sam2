@@ -1,0 +1,9 @@
+pydantic==2.9.2
+aiohttp==3.10.5
+PyYAML==6.0.2
+numpy==2.1.1
+torch==2.4.1
+pillow==10.4.0
+aioboto3==13.1.1
+boto3==1.34.131
+botocore==1.34.131

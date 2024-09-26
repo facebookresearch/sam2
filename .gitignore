@@ -8,3 +8,4 @@ build/*
 _C.*
 outputs/*
 checkpoints/*.pt
+.idea/

@@ -12,6 +12,7 @@ import torch
 from torchvision.ops.boxes import batched_nms, box_area  # type: ignore
 
 from sam2.modeling.sam2_base import SAM2Base
+from sam2.map_tensor import to_map_tensor
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 from sam2.utils.amg import (
     area_from_rle,
@@ -410,20 +411,35 @@ class SAM2AutomaticMaskGenerator:
             in_pointss.append(in_points)
             in_labelss.append(in_labels)
 
-        maskss = []
-        iou_predss = []
-        low_res_maskss = []
-        for (in_points, in_labels) in zip(in_pointss, in_labelss):
-            with torch.autograd.profiler.record_function("_predict"):
-                masks, iou_preds, low_res_masks = self.predictor._predict(
-                    in_points[:, None, :],
-                    in_labels[:, None],
-                    multimask_output=self.multimask_output,
-                    return_logits=True,
-                )
-            maskss.append(masks)
-            iou_predss.append(iou_preds)
-            low_res_maskss.append(low_res_masks)
+        in_pointss = torch.stack(in_pointss)
+        in_labelss = torch.stack(in_labelss)
+
+        print("A0")
+        # maskss = []
+        # iou_predss = []
+        # low_res_maskss = []
+        # for (in_points, in_labels) in zip(in_pointss, in_labelss):
+        #     with torch.autograd.profiler.record_function("_predict"):
+        #         masks, iou_preds, low_res_masks = self.predictor._predict(
+        #             in_points[:, None, :],
+        #             in_labels[:, None],
+        #             multimask_output=self.multimask_output,
+        #             return_logits=True,
+        #         )
+        #     maskss.append(masks)
+        #     iou_predss.append(iou_preds)
+        #     low_res_maskss.append(low_res_masks)
+
+        maskss, iou_predss, low_res_maskss = self.predictor._predict(
+            to_map_tensor(in_pointss[:, :, None, :]),
+            to_map_tensor(in_labelss[:, :, None]),
+            multimask_output=self.multimask_output,
+            return_logits=True,
+        )
+
+        print("A1")
+        import pdb; pdb.set_trace()
+        import sys; sys.exit(1)
 
         datas = []
         for (masks, iou_preds, low_res_masks) in zip(maskss, iou_predss, low_res_maskss):

@@ -165,11 +165,11 @@ def ops_impl(cls, func, types, args, kwargs=None):
         # print("0 resa.size(): ", resa.size())
         resb = resa.view((unwrapped_args[0].size(0), unwrapped_args[0].size(1)) + resa.size()[1:])
         # print("1 resb.size(): ", resb.size())
-        res_0 = func(*((unwrapped_args[0][0],) + unwrapped_args[1:]))
-        if not torch.allclose(resb[0], res_0):
-            print("139203")
-            import pdb; pdb.set_trace()
-            pass
+        # res_0 = func(*((unwrapped_args[0][0],) + unwrapped_args[1:]))
+        # if not torch.allclose(resb[0], res_0):
+        #     print("139203")
+        #     import pdb; pdb.set_trace()
+        #     pass
         return wrap(resb)
 
     if func == torch.ops.aten.upsample_bilinear2d.default:
@@ -185,11 +185,11 @@ def ops_impl(cls, func, types, args, kwargs=None):
         # print("0 resa.size(): ", resa.size())
         resb = resa.view((unwrapped_args[0].size(0), unwrapped_args[0].size(1)) + resa.size()[1:])
         # print("1 resb.size(): ", resb.size())
-        res_0 = func(*((unwrapped_args[0][0],) + unwrapped_args[1:]))
-        if not torch.allclose(resb[0], res_0):
-            print("139203")
-            import pdb; pdb.set_trace()
-            pass
+        # res_0 = func(*((unwrapped_args[0][0],) + unwrapped_args[1:]))
+        # if not torch.allclose(resb[0], res_0):
+        #     print("139203")
+        #     import pdb; pdb.set_trace()
+        #     pass
         return wrap(resb)
 
     if func == torch.ops.aten.transpose.int:
@@ -285,22 +285,22 @@ class MapTensor(torch.Tensor):
     def __torch_dispatch__(cls, func, types, args, kwargs=None):
         # print("func: ", func)
         res = ops_impl(cls, func, types, args, kwargs)
-        if isinstance(res, torch.Tensor):
-            unwrapped_args_0 = tree_map(lambda x: unwrap_i(x, 0), args)
-            unwrapped_kwargs_0 = tree_map(lambda x: unwrap_i(x, 0), kwargs)
-            if func == torch.ops.aten.view.default:
-                res_0 = torch.ops.aten.reshape.default(*unwrapped_args_0, **unwrapped_kwargs_0)
-            else:
-                res_0 = func(*unwrapped_args_0, **unwrapped_kwargs_0)
-            if res.elems[0].size() != res_0.size():
-                import pdb; pdb.set_trace()
-                print("02390")
-            if not torch.allclose(res.elems[0], res_0, atol=1e-3, rtol=1e-3):
-                import pdb; pdb.set_trace()
-                print("SDJFKL")
-        else:
-            pass
-            # print("res got type: ", type(res))
+        # if isinstance(res, torch.Tensor):
+        #     unwrapped_args_0 = tree_map(lambda x: unwrap_i(x, 0), args)
+        #     unwrapped_kwargs_0 = tree_map(lambda x: unwrap_i(x, 0), kwargs)
+        #     if func == torch.ops.aten.view.default:
+        #         res_0 = torch.ops.aten.reshape.default(*unwrapped_args_0, **unwrapped_kwargs_0)
+        #     else:
+        #         res_0 = func(*unwrapped_args_0, **unwrapped_kwargs_0)
+        #     if res.elems[0].size() != res_0.size():
+        #         import pdb; pdb.set_trace()
+        #         print("02390")
+        #     if not torch.allclose(res.elems[0], res_0, atol=1e-3, rtol=1e-3):
+        #         import pdb; pdb.set_trace()
+        #         print("SDJFKL")
+        # else:
+        #     pass
+        #     # print("res got type: ", type(res))
         return res
 
     __torch_function__ = torch._C._disabled_torch_function_impl

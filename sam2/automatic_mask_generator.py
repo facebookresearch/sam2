@@ -429,12 +429,13 @@ class SAM2AutomaticMaskGenerator:
         #     iou_predss.append(iou_preds)
         #     low_res_maskss.append(low_res_masks)
 
-        maskss, iou_predss, low_res_maskss = self.predictor._predict(
-            to_map_tensor(in_pointss[:, :, None, :]),
-            to_map_tensor(in_labelss[:, :, None]),
-            multimask_output=self.multimask_output,
-            return_logits=True,
-        )
+        with torch.autograd.profiler.record_function("_predict"):
+            maskss, iou_predss, low_res_maskss = self.predictor._predict(
+                to_map_tensor(in_pointss[:, :, None, :]),
+                to_map_tensor(in_labelss[:, :, None]),
+                multimask_output=self.multimask_output,
+                return_logits=True,
+            )
 
         datas = []
         for (masks, iou_preds, low_res_masks) in zip(maskss, iou_predss, low_res_maskss):

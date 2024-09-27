@@ -59,20 +59,21 @@ def ops_impl(cls, func, types, args, kwargs=None):
     if func == torch.ops.aten.add.Tensor:
         assert len(unwrapped_kwargs) == 0
         assert len(unwrapped_args) == 2, f"args: {unwrapped_args}"
-        print("unwrapped_args")
-        print([type(a) for a in unwrapped_args])
+        # print("unwrapped_args")
+        # print([type(a) for a in unwrapped_args])
         if not isinstance(args[0], MapTensor) and isinstance(args[1], MapTensor):
             if args[0].dim() == (args[1].dim() + 1):
                 return NotImplemented
                 # return wrap(func(unwrapped_args[0], unwrapped_args[1].unsqueeze(1)))
-            print("args[0].dim(): ", args[0].dim())
-            print("args[1].dim(): ", args[1].dim())
-            print("type(args[0]): ", type(args[0]))
-            print("type(args[1]): ", type(args[1]))
+            # print("args[0].dim(): ", args[0].dim())
+            # print("args[1].dim(): ", args[1].dim())
+            # print("type(args[0]): ", type(args[0]))
+            # print("type(args[1]): ", type(args[1]))
+            # TODO: THIS GETS CALLED???
             return NotImplemented
         pass
 
-    if func == torch.ops.aten.cat.default:
+    if func in [torch.ops.aten.cat.default, torch.ops.aten.stack.default]:
         assert len(unwrapped_kwargs) == 0
         assert len(unwrapped_args) == 2, f"args: {unwrapped_args}"
         # TODO: Use MapTensor type for filter
@@ -83,14 +84,14 @@ def ops_impl(cls, func, types, args, kwargs=None):
             if a.dim() > dim:
                 dim = a.dim()
                 size = a.size()
-        args = []
+        new_args = []
         for a in unwrapped_args[0]:
             if a.dim() == dim:
-                args.append(a)
+                new_args.append(a)
             else:
                 assert a.dim() + 1 == dim
-                args.append(a.unsqueeze(0).expand((size[0],) + a.size()))
-        return wrap(func(args, wrap_dim(unwrapped_args[1], dim - 1) + 1))
+                new_args.append(a.unsqueeze(0).expand((size[0],) + a.size()))
+        return wrap(func(new_args, wrap_dim(unwrapped_args[1], dim - 1) + 1))
 
     if func == torch.ops.aten.select.int:
         assert len(unwrapped_kwargs) == 0
@@ -107,7 +108,7 @@ def ops_impl(cls, func, types, args, kwargs=None):
                          unwrapped_args[3]))
 
     if func == torch.ops.aten.mean.dim:
-        TODO: THIS MIGHT BE WRONG
+        # TODO: THIS MIGHT BE WRONG
         assert len(unwrapped_kwargs) == 0
         assert len(unwrapped_args) == 3, f"args: {unwrapped_args}"
         assert len(unwrapped_args[1]) == 1
@@ -116,8 +117,7 @@ def ops_impl(cls, func, types, args, kwargs=None):
                          [wrap_dim(unwrapped_args[1][0], dim - 1) + 1],
                          unwrapped_args[2]))
 
-    view_ops = [torch.ops.aten.view.default,
-                torch.ops.aten._unsafe_view.default,
+    view_ops = [torch.ops.aten._unsafe_view.default,
                 torch.ops.aten.expand.default]
     if func in view_ops:
         assert len(unwrapped_kwargs) == 0
@@ -126,10 +126,26 @@ def ops_impl(cls, func, types, args, kwargs=None):
         bigger_size = list(input_size[:1]) + unwrapped_args[1]
         return wrap(func(unwrapped_args[0], bigger_size))
 
-    if func == torch.ops.aten.mm.default:
+    if func is torch.ops.aten.view.default:
+        assert len(unwrapped_kwargs) == 0
+        assert len(unwrapped_args) == 2, f"args: {unwrapped_args}"
+        input_size = unwrapped_args[0].size()
+        bigger_size = list(input_size[:1]) + unwrapped_args[1]
+        return wrap(unwrapped_args[0].reshape(bigger_size))
+
+    if func in [torch.ops.aten.mm.default, torch.ops.aten.bmm.default]:
         assert len(unwrapped_kwargs) == 0
         assert len(unwrapped_args) == 2, f"args: {unwrapped_args}"
         return wrap(torch.matmul(*unwrapped_args))
+
+    if func in [torch.ops.aten.unsqueeze.default]:
+        assert len(unwrapped_kwargs) == 0
+        assert len(unwrapped_args) == 2, f"args: {unwrapped_args}"
+        dim = unwrapped_args[0].dim()
+        new_i = unwrapped_args[1]
+        if new_i >= 0:
+            new_i += 1
+        return wrap(func(unwrapped_args[0], new_i))
 
     if func == torch.ops.aten.addmm.default:
         assert len(unwrapped_kwargs) == 0
@@ -139,8 +155,42 @@ def ops_impl(cls, func, types, args, kwargs=None):
     if func == torch.ops.aten.convolution.default:
         assert len(unwrapped_kwargs) == 0
         assert len(unwrapped_args) == 9, f"args: {unwrapped_args}"
-        res = func(*((unwrapped_args[0].flatten(0, 1),) + unwrapped_args[1:]))
-        return wrap(res.view((unwrapped_args[0].size(0), unwrapped_args[0].size(1)) + res.size()[1:]))
+        a = unwrapped_args[0]
+        # print("0 a.size(): ", a.size())
+        a = unwrapped_args[0].flatten(0, 1)
+        # print("1 a.size(): ", a.size())
+        # TODO: It's scary that this .contiguous seems necessary, but I guess we're below composite conv
+        # which might expected contiguous output
+        resa = func(*((a,) + unwrapped_args[1:])).contiguous()
+        # print("0 resa.size(): ", resa.size())
+        resb = resa.view((unwrapped_args[0].size(0), unwrapped_args[0].size(1)) + resa.size()[1:])
+        # print("1 resb.size(): ", resb.size())
+        res_0 = func(*((unwrapped_args[0][0],) + unwrapped_args[1:]))
+        if not torch.allclose(resb[0], res_0):
+            print("139203")
+            import pdb; pdb.set_trace()
+            pass
+        return wrap(resb)
+
+    if func == torch.ops.aten.upsample_bilinear2d.default:
+        assert len(unwrapped_kwargs) == 0
+        assert len(unwrapped_args) == 3, f"args: {unwrapped_args}"
+        a = unwrapped_args[0]
+        # print("0 a.size(): ", a.size())
+        a = unwrapped_args[0].flatten(0, 1)
+        # print("1 a.size(): ", a.size())
+        # TODO: It's scary that this .contiguous seems necessary, but I guess we're below composite conv
+        # which might expected contiguous output
+        resa = func(*((a,) + unwrapped_args[1:])).contiguous()
+        # print("0 resa.size(): ", resa.size())
+        resb = resa.view((unwrapped_args[0].size(0), unwrapped_args[0].size(1)) + resa.size()[1:])
+        # print("1 resb.size(): ", resb.size())
+        res_0 = func(*((unwrapped_args[0][0],) + unwrapped_args[1:]))
+        if not torch.allclose(resb[0], res_0):
+            print("139203")
+            import pdb; pdb.set_trace()
+            pass
+        return wrap(resb)
 
     if func == torch.ops.aten.transpose.int:
         assert len(unwrapped_kwargs) == 0
@@ -233,12 +283,15 @@ class MapTensor(torch.Tensor):
 
     @classmethod
     def __torch_dispatch__(cls, func, types, args, kwargs=None):
-        print("func: ", func)
+        # print("func: ", func)
         res = ops_impl(cls, func, types, args, kwargs)
         if isinstance(res, torch.Tensor):
             unwrapped_args_0 = tree_map(lambda x: unwrap_i(x, 0), args)
             unwrapped_kwargs_0 = tree_map(lambda x: unwrap_i(x, 0), kwargs)
-            res_0 = func(*unwrapped_args_0, **unwrapped_kwargs_0)
+            if func == torch.ops.aten.view.default:
+                res_0 = torch.ops.aten.reshape.default(*unwrapped_args_0, **unwrapped_kwargs_0)
+            else:
+                res_0 = func(*unwrapped_args_0, **unwrapped_kwargs_0)
             if res.elems[0].size() != res_0.size():
                 import pdb; pdb.set_trace()
                 print("02390")
@@ -246,7 +299,8 @@ class MapTensor(torch.Tensor):
                 import pdb; pdb.set_trace()
                 print("SDJFKL")
         else:
-            print("res got type: ", type(res))
+            pass
+            # print("res got type: ", type(res))
         return res
 
     __torch_function__ = torch._C._disabled_torch_function_impl

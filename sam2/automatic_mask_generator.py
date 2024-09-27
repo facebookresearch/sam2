@@ -414,7 +414,6 @@ class SAM2AutomaticMaskGenerator:
         in_pointss = torch.stack(in_pointss)
         in_labelss = torch.stack(in_labelss)
 
-        print("A0")
         # maskss = []
         # iou_predss = []
         # low_res_maskss = []
@@ -436,10 +435,6 @@ class SAM2AutomaticMaskGenerator:
             multimask_output=self.multimask_output,
             return_logits=True,
         )
-
-        print("A1")
-        import pdb; pdb.set_trace()
-        import sys; sys.exit(1)
 
         datas = []
         for (masks, iou_preds, low_res_masks) in zip(maskss, iou_predss, low_res_maskss):

@@ -264,6 +264,60 @@ def ops_impl(cls, func, types, args, kwargs=None):
             return (wrap(sdpa_res[0].view((a1_size[0],) + a0_size)),) + sdpa_res[1:]
         return NotImplemented
 
+    if func == torch.ops.aten._scaled_dot_product_flash_attention.default:
+        assert len(args) == 3
+        assert len(unwrapped_kwargs) == 1
+        assert len(unwrapped_args) == 3, f"args: {unwrapped_args}"
+        if all(isinstance(a, MapTensor) for a in args[:3]):
+            assert unwrapped_args[0].dim() == 5
+            assert unwrapped_args[1].dim() == 5
+            assert unwrapped_args[2].dim() == 5
+            sdpa_res = wrap(func(unwrapped_args[0].flatten(0, 1),
+                                 unwrapped_args[1].flatten(0, 1),
+                                 unwrapped_args[2].flatten(0, 1),
+                                 **unwrapped_kwargs))
+            return (wrap(sdpa_res[0].view(unwrapped_args[0].size())),) + sdpa_res[1:]
+        if isinstance(args[0], MapTensor) and not any(isinstance(a, MapTensor) for a in args[1:]):
+            assert unwrapped_args[0].dim() == 5
+            assert unwrapped_args[1].dim() == 4
+            assert unwrapped_args[2].dim() == 4
+            a0 = unwrapped_args[0]
+            a1_size = unwrapped_args[1].size()
+            a1 = unwrapped_args[1].unsqueeze(0).expand((a0.size(0),) + a1_size)
+            a2 = unwrapped_args[2].unsqueeze(0).expand((a0.size(0),) + a1_size)
+            sdpa_res = wrap(func(a0.flatten(0, 1),
+                                 a1.flatten(0, 1),
+                                 a2.flatten(0, 1),
+                                 **unwrapped_kwargs))
+            return (wrap(sdpa_res[0].view(unwrapped_args[0].size())),) + sdpa_res[1:]
+        if ((not isinstance(args[0], MapTensor)) and isinstance(args[1], MapTensor) and (not isinstance(args[2], MapTensor))):
+            assert unwrapped_args[0].dim() == 4
+            assert unwrapped_args[1].dim() == 5
+            assert unwrapped_args[2].dim() == 4
+            a1_size = unwrapped_args[1].size()
+            a0 = unwrapped_args[0].unsqueeze(0).expand((a1_size[0],) + unwrapped_args[0].size()[1:])
+            a2 = unwrapped_args[2].unsqueeze(0).expand((a1_size[0],) + unwrapped_args[2].size()[1:])
+            sdpa_res = wrap(func(a0.flatten(0, 1),
+                                 a1.flatten(0, 1),
+                                 a2.flatten(0, 1),
+                                 **unwrapped_kwargs))
+            return (wrap(sdpa_res[0].view(unwrapped_args[0].size())),) + sdpa_res[1:]
+        if ((not isinstance(args[0], MapTensor)) and isinstance(args[1], MapTensor) and isinstance(args[2], MapTensor)):
+            assert unwrapped_args[0].dim() == 4
+            assert unwrapped_args[1].dim() == 5
+            assert unwrapped_args[2].dim() == 5
+            a0_size = unwrapped_args[0].size()
+            a1_size = unwrapped_args[1].size()
+            a0 = unwrapped_args[0].unsqueeze(0).expand((a1_size[0],) + a0_size)
+            a1 = unwrapped_args[1]
+            a2 = unwrapped_args[2]
+            sdpa_res = wrap(func(a0.flatten(0, 1),
+                                 a1.flatten(0, 1),
+                                 a2.flatten(0, 1),
+                                 **unwrapped_kwargs))
+            return (wrap(sdpa_res[0].view((a1_size[0],) + a0_size)),) + sdpa_res[1:]
+        return NotImplemented
+
 
     res = wrap(func(*unwrapped_args, **unwrapped_kwargs))
     # import sys; sys.exit(1)

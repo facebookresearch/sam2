@@ -57,8 +57,6 @@ or individually from:
 
 (note that these are the improved checkpoints denoted as SAM 2.1; see [Model Description](#model-description) for details.)
 
-(note that these are the improved checkpoints denoted as SAM 2.1; see [Model Description](#model-description) for details.)
-
 Then SAM 2 can be used in a few lines as follows for image and video prediction.
 
 ### Image prediction
@@ -147,6 +145,7 @@ with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
 ## Model Description
 
 ### SAM 2.1 checkpoints
+
 The table below shows the improved SAM 2.1 checkpoints released on September 29, 2024.
 |      **Model**       | **Size (M)** |    **Speed (FPS)**     | **SA-V test (J&F)** | **MOSE val (J&F)** | **LVOS v2 (J&F)** |
 | :------------------: | :----------: | :--------------------: | :-----------------: | :----------------: | :---------------: |
@@ -156,6 +155,7 @@ The table below shows the improved SAM 2.1 checkpoints released on September 29,
 |   sam2.1_hiera_large <br /> ([config](sam2/configs/sam2.1/sam2.1_hiera_l.yaml), [checkpoint](https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_large.pt))   |    224.4     | 24.2 (30.2 compiled\*) |        79.5         |        74.6        |       80.6        |
 
 ### SAM 2 checkpoints
+
 The previous SAM 2 checkpoints released on July 29, 2024 can be found as follows:
 
 |      **Model**       | **Size (M)** |    **Speed (FPS)**     | **SA-V test (J&F)** | **MOSE val (J&F)** | **LVOS v2 (J&F)** |

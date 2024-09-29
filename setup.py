@@ -17,7 +17,7 @@ AUTHOR_EMAIL = "segment-anything@meta.com"
 LICENSE = "Apache 2.0"
 
 # Read the contents of README file
-with open("README.md", "r") as f:
+with open("README.md", "r", encoding="utf-8") as f:
     LONG_DESCRIPTION = f.read()
 
 # Required dependencies

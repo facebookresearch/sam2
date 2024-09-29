@@ -11,6 +11,41 @@ from hydra import compose
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
 
+HF_MODEL_ID_TO_FILENAMES = {
+    "facebook/sam2-hiera-tiny": (
+        "configs/sam2/sam2_hiera_t.yaml",
+        "sam2_hiera_tiny.pt",
+    ),
+    "facebook/sam2-hiera-small": (
+        "configs/sam2/sam2_hiera_s.yaml",
+        "sam2_hiera_small.pt",
+    ),
+    "facebook/sam2-hiera-base-plus": (
+        "configs/sam2/sam2_hiera_b+.yaml",
+        "sam2_hiera_base_plus.pt",
+    ),
+    "facebook/sam2-hiera-large": (
+        "configs/sam2/sam2_hiera_l.yaml",
+        "sam2_hiera_large.pt",
+    ),
+    "facebook/sam2.1-hiera-tiny": (
+        "configs/sam2.1/sam2.1_hiera_t.yaml",
+        "sam2.1_hiera_tiny.pt",
+    ),
+    "facebook/sam2.1-hiera-small": (
+        "configs/sam2.1/sam2.1_hiera_s.yaml",
+        "sam2.1_hiera_small.pt",
+    ),
+    "facebook/sam2.1-hiera-base-plus": (
+        "configs/sam2.1/sam2.1_hiera_b+.yaml",
+        "sam2.1_hiera_base_plus.pt",
+    ),
+    "facebook/sam2.1-hiera-large": (
+        "configs/sam2.1/sam2.1_hiera_l.yaml",
+        "sam2.1_hiera_large.pt",
+    ),
+}
+
 
 def build_sam2(
     config_file,
@@ -78,39 +113,21 @@ def build_sam2_video_predictor(
     return model
 
 
-def build_sam2_hf(model_id, **kwargs):
-
+def _hf_download(model_id):
     from huggingface_hub import hf_hub_download
 
-    model_id_to_filenames = {
-        "facebook/sam2-hiera-tiny": ("sam2_hiera_t.yaml", "sam2_hiera_tiny.pt"),
-        "facebook/sam2-hiera-small": ("sam2_hiera_s.yaml", "sam2_hiera_small.pt"),
-        "facebook/sam2-hiera-base-plus": (
-            "sam2_hiera_b+.yaml",
-            "sam2_hiera_base_plus.pt",
-        ),
-        "facebook/sam2-hiera-large": ("sam2_hiera_l.yaml", "sam2_hiera_large.pt"),
-    }
-    config_name, checkpoint_name = model_id_to_filenames[model_id]
+    config_name, checkpoint_name = HF_MODEL_ID_TO_FILENAMES[model_id]
     ckpt_path = hf_hub_download(repo_id=model_id, filename=checkpoint_name)
+    return config_name, ckpt_path
+
+
+def build_sam2_hf(model_id, **kwargs):
+    config_name, ckpt_path = _hf_download(model_id)
     return build_sam2(config_file=config_name, ckpt_path=ckpt_path, **kwargs)
 
 
 def build_sam2_video_predictor_hf(model_id, **kwargs):
-
-    from huggingface_hub import hf_hub_download
-
-    model_id_to_filenames = {
-        "facebook/sam2-hiera-tiny": ("sam2_hiera_t.yaml", "sam2_hiera_tiny.pt"),
-        "facebook/sam2-hiera-small": ("sam2_hiera_s.yaml", "sam2_hiera_small.pt"),
-        "facebook/sam2-hiera-base-plus": (
-            "sam2_hiera_b+.yaml",
-            "sam2_hiera_base_plus.pt",
-        ),
-        "facebook/sam2-hiera-large": ("sam2_hiera_l.yaml", "sam2_hiera_large.pt"),
-    }
-    config_name, checkpoint_name = model_id_to_filenames[model_id]
-    ckpt_path = hf_hub_download(repo_id=model_id, filename=checkpoint_name)
+    config_name, ckpt_path = _hf_download(model_id)
     return build_sam2_video_predictor(
         config_file=config_name, ckpt_path=ckpt_path, **kwargs
     )

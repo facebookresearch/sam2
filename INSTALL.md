@@ -9,13 +9,13 @@
 
 Then, install SAM 2 from the root of this repository via
 ```bash
-pip install -e ".[demo]"
+pip install -e ".[notebooks]"
 ```
 
 Note that you may skip building the SAM 2 CUDA extension during installation via environment variable `SAM2_BUILD_CUDA=0`, as follows:
 ```bash
 # skip the SAM 2 CUDA extension
-SAM2_BUILD_CUDA=0 pip install -e ".[demo]"
+SAM2_BUILD_CUDA=0 pip install -e ".[notebooks]"
 ```
 This would also skip the post-processing step at runtime (removing small holes and sprinkles in the output masks, which requires the CUDA extension), but shouldn't affect the results in most cases.
 
@@ -29,7 +29,7 @@ If you would like to enable this post-processing step, you can reinstall SAM 2 o
 ```bash
 pip uninstall -y SAM-2 && \
 rm -f ./sam2/*.so && \
-SAM2_BUILD_ALLOW_ERRORS=0 pip install -v -e ".[demo]"
+SAM2_BUILD_ALLOW_ERRORS=0 pip install -v -e ".[notebooks]"
 ```
 
 Note that PyTorch needs to be installed first before building the SAM 2 CUDA extension. It's also necessary to install [CUDA toolkits](https://developer.nvidia.com/cuda-toolkit-archive) that match the CUDA version for your PyTorch installation. (This should typically be CUDA 12.1 if you follow the default installation command.) After installing the CUDA toolkits, you can check its version via `nvcc --version`.
@@ -46,18 +46,18 @@ I got `ImportError: cannot import name '_C' from 'sam2'`
 </summary>
 <br/>
 
-This is usually because you haven't run the `pip install -e ".[demo]"` step above or the installation failed. Please install SAM 2 first, and see the other issues if your installation fails.
+This is usually because you haven't run the `pip install -e ".[notebooks]"` step above or the installation failed. Please install SAM 2 first, and see the other issues if your installation fails.
 
 In some systems, you may need to run `python setup.py build_ext --inplace` in the SAM 2 repo root as suggested in https://github.com/facebookresearch/segment-anything-2/issues/77.
 </details>
 
 <details>
 <summary>
-I got `MissingConfigException: Cannot find primary config 'sam2_hiera_l.yaml'`
+I got `MissingConfigException: Cannot find primary config 'configs/sam2.1/sam2.1_hiera_l.yaml'`
 </summary>
 <br/>
 
-This is usually because you haven't run the `pip install -e .` step above, so `sam2_configs` isn't in your Python's `sys.path`. Please run this installation step. In case it still fails after the installation step, you may try manually adding the root of this repo to `PYTHONPATH` via
+This is usually because you haven't run the `pip install -e .` step above, so `sam2` isn't in your Python's `sys.path`. Please run this installation step. In case it still fails after the installation step, you may try manually adding the root of this repo to `PYTHONPATH` via
 ```bash
 export SAM2_REPO_ROOT=/path/to/segment-anything-2  # path to this repo
 export PYTHONPATH="${SAM2_REPO_ROOT}:${PYTHONPATH}"

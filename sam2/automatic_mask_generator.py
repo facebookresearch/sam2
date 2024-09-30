@@ -275,26 +275,27 @@ class SAM2AutomaticMaskGenerator:
         batch_datas = self._process_batches(
             pointss, cropped_im_size, crop_box, orig_size, normalize=True
         )
-        for batch_data in batch_datas:
-            data.cat(batch_data)
-            del batch_data
-        self.predictor.reset_predictor()
+        with torch.autograd.profiler.record_function("rest of crop 0"):
+            for batch_data in batch_datas:
+                data.cat(batch_data)
+                del batch_data
+            self.predictor.reset_predictor()
 
-        # Remove duplicates within this crop.
-        keep_by_nms = batched_nms(
-            data["boxes"].float(),
-            data["iou_preds"],
-            torch.zeros_like(data["boxes"][:, 0]),  # categories
-            iou_threshold=self.box_nms_thresh,
-        )
-        data.filter(keep_by_nms)
+            # Remove duplicates within this crop.
+            keep_by_nms = batched_nms(
+                data["boxes"].float(),
+                data["iou_preds"],
+                torch.zeros_like(data["boxes"][:, 0]),  # categories
+                iou_threshold=self.box_nms_thresh,
+            )
+            data.filter(keep_by_nms)
 
-        # Return to the original image frame
-        data["boxes"] = uncrop_boxes_xyxy(data["boxes"], crop_box)
-        data["points"] = uncrop_points(data["points"], crop_box)
-        data["crop_boxes"] = torch.tensor([crop_box for _ in range(len(data["rles"]))])
+            # Return to the original image frame
+            data["boxes"] = uncrop_boxes_xyxy(data["boxes"], crop_box)
+            data["points"] = uncrop_points(data["points"], crop_box)
+            data["crop_boxes"] = torch.tensor([crop_box for _ in range(len(data["rles"]))])
 
-        return data
+            return data
 
     def _process_batch(
         self,
@@ -437,73 +438,74 @@ class SAM2AutomaticMaskGenerator:
                 return_logits=True,
             )
 
-        datas = []
-        for (masks, iou_preds, low_res_masks) in zip(maskss, iou_predss, low_res_maskss):
-            # Serialize predictions and store in MaskData
-            data = MaskData(
-                masks=masks.flatten(0, 1),
-                iou_preds=iou_preds.flatten(0, 1),
-                points=points.repeat_interleave(masks.shape[1], dim=0),
-                low_res_masks=low_res_masks.flatten(0, 1),
-            )
-            del masks
+        with torch.autograd.profiler.record_function("other 0"):
+            datas = []
+            for (masks, iou_preds, low_res_masks) in zip(maskss, iou_predss, low_res_maskss):
+                # Serialize predictions and store in MaskData
+                data = MaskData(
+                    masks=masks.flatten(0, 1),
+                    iou_preds=iou_preds.flatten(0, 1),
+                    points=points.repeat_interleave(masks.shape[1], dim=0),
+                    low_res_masks=low_res_masks.flatten(0, 1),
+                )
+                del masks
 
-            if not self.use_m2m:
-                # Filter by predicted IoU
-                if self.pred_iou_thresh > 0.0:
-                    keep_mask = data["iou_preds"] > self.pred_iou_thresh
+                if not self.use_m2m:
+                    # Filter by predicted IoU
+                    if self.pred_iou_thresh > 0.0:
+                        keep_mask = data["iou_preds"] > self.pred_iou_thresh
+                        data.filter(keep_mask)
+
+                    # Calculate and filter by stability score
+                    data["stability_score"] = calculate_stability_score(
+                        data["masks"], self.mask_threshold, self.stability_score_offset
+                    )
+                    if self.stability_score_thresh > 0.0:
+                        keep_mask = data["stability_score"] >= self.stability_score_thresh
+                        data.filter(keep_mask)
+                else:
+                    # One step refinement using previous mask predictions
+                    in_points = self.predictor._transforms.transform_coords(
+                        data["points"], normalize=normalize, orig_hw=im_size
+                    )
+                    labels = torch.ones(
+                        in_points.shape[0], dtype=torch.int, device=in_points.device
+                    )
+                    masks, ious = self.refine_with_m2m(
+                        in_points, labels, data["low_res_masks"], self.points_per_batch
+                    )
+                    data["masks"] = masks.squeeze(1)
+                    data["iou_preds"] = ious.squeeze(1)
+
+                    if self.pred_iou_thresh > 0.0:
+                        keep_mask = data["iou_preds"] > self.pred_iou_thresh
+                        data.filter(keep_mask)
+
+                    data["stability_score"] = calculate_stability_score(
+                        data["masks"], self.mask_threshold, self.stability_score_offset
+                    )
+                    if self.stability_score_thresh > 0.0:
+                        keep_mask = data["stability_score"] >= self.stability_score_thresh
+                        data.filter(keep_mask)
+
+                # Threshold masks and calculate boxes
+                data["masks"] = data["masks"] > self.mask_threshold
+                data["boxes"] = batched_mask_to_box(data["masks"])
+
+                # Filter boxes that touch crop boundaries
+                keep_mask = ~is_box_near_crop_edge(
+                    data["boxes"], crop_box, [0, 0, orig_w, orig_h]
+                )
+                if not torch.all(keep_mask):
                     data.filter(keep_mask)
 
-                # Calculate and filter by stability score
-                data["stability_score"] = calculate_stability_score(
-                    data["masks"], self.mask_threshold, self.stability_score_offset
-                )
-                if self.stability_score_thresh > 0.0:
-                    keep_mask = data["stability_score"] >= self.stability_score_thresh
-                    data.filter(keep_mask)
-            else:
-                # One step refinement using previous mask predictions
-                in_points = self.predictor._transforms.transform_coords(
-                    data["points"], normalize=normalize, orig_hw=im_size
-                )
-                labels = torch.ones(
-                    in_points.shape[0], dtype=torch.int, device=in_points.device
-                )
-                masks, ious = self.refine_with_m2m(
-                    in_points, labels, data["low_res_masks"], self.points_per_batch
-                )
-                data["masks"] = masks.squeeze(1)
-                data["iou_preds"] = ious.squeeze(1)
+                # Compress to RLE
+                data["masks"] = uncrop_masks(data["masks"], crop_box, orig_h, orig_w)
+                data["rles"] = mask_to_rle_pytorch_2(data["masks"])
+                del data["masks"]
 
-                if self.pred_iou_thresh > 0.0:
-                    keep_mask = data["iou_preds"] > self.pred_iou_thresh
-                    data.filter(keep_mask)
-
-                data["stability_score"] = calculate_stability_score(
-                    data["masks"], self.mask_threshold, self.stability_score_offset
-                )
-                if self.stability_score_thresh > 0.0:
-                    keep_mask = data["stability_score"] >= self.stability_score_thresh
-                    data.filter(keep_mask)
-
-            # Threshold masks and calculate boxes
-            data["masks"] = data["masks"] > self.mask_threshold
-            data["boxes"] = batched_mask_to_box(data["masks"])
-
-            # Filter boxes that touch crop boundaries
-            keep_mask = ~is_box_near_crop_edge(
-                data["boxes"], crop_box, [0, 0, orig_w, orig_h]
-            )
-            if not torch.all(keep_mask):
-                data.filter(keep_mask)
-
-            # Compress to RLE
-            data["masks"] = uncrop_masks(data["masks"], crop_box, orig_h, orig_w)
-            data["rles"] = mask_to_rle_pytorch_2(data["masks"])
-            del data["masks"]
-
-            datas.append(data)
-        return datas
+                datas.append(data)
+            return datas
 
     @staticmethod
     def postprocess_small_regions(

@@ -348,11 +348,12 @@ def ops_impl(cls, func, types, args, kwargs=None):
                        torch.ops.aten.unbind.int,
                        torch.ops.aten.where.self,
                        torch.ops.aten.zeros_like.default,
+                       torch.ops.aten._to_copy.default,
                    ]
     if func in forwardables:
         return wrap(func(*unwrapped_args, **unwrapped_kwargs))
-    print("Not supported func: ", func)
-    return NotImplemented
+    print("WARNING! Not officially marked as forwardable: torch.ops.", func)
+    return wrap(func(*unwrapped_args, **unwrapped_kwargs))
 
 class MapTensor(torch.Tensor):
     @staticmethod

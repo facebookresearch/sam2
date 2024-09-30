@@ -57,69 +57,63 @@ sam2.to(device=device)
 mask_generator = SAM2AutomaticMaskGenerator(sam2)
 
 # ### ---
-# # TODO: Causes a numerical mismatch
-# 
+# TODO: Causes a numerical mismatch. CUDA graphs?
+
 # torch.set_float32_matmul_precision('high')
 # torch.autocast("cuda", dtype=torch.bfloat16).__enter__()
 # mask_generator.predictor.model.image_encoder = torch.compile(
 #     mask_generator.predictor.model.image_encoder,
-#     mode="max-autotune",
+#     mode="max-autotune-no-cudagraphs",
 #     fullgraph=True,
 #     dynamic=False,
 # )
-
-# mask_generator.predictor.model.sam_mask_decoder.transformer = torch.compile(
-#     mask_generator.predictor.model.sam_mask_decoder.transformer,
+# 
+# mask_generator.predictor._predict = torch.compile(
+#     mask_generator.predictor._predict,
 #     mode="max-autotune-no-cudagraphs",
 #     fullgraph=True,
 #     dynamic=False,
 # )
 
-mask_generator.predictor._predict = torch.compile(
-    mask_generator.predictor._predict,
-    mode="max-autotune-no-cudagraphs",
-    fullgraph=True,
-    dynamic=False,
-)
-
 # ### ---
 
 
-# Run thrice for warmup
-masks = mask_generator.generate(image)
-masks = mask_generator.generate(image)
-masks = mask_generator.generate(image)
-
-# Save an example
-plt.figure(figsize=(image.shape[1]/100., image.shape[0]/100.), dpi=100)
-plt.imshow(image)
-ms = show_anns(masks)
-ms_ref = torch.load("dog_mask_fast.pt")
-# # TODO: USE mIoU!
-torch.testing.assert_allclose(ms, ms_ref)
-print("Masks match reference")
-# torch.save(ms, "dog_mask_fast.pt")
-plt.axis('off')
-plt.tight_layout()
-plt.savefig('dog_mask_fast.png', format='png')
-
-# Benchmark
-torch.cuda.synchronize()
-start_event = torch.cuda.Event(enable_timing=True)
-end_event = torch.cuda.Event(enable_timing=True)
-start_event.record()
-for _ in range(10):
+with torch.no_grad():
+    # Run thrice for warmup
     masks = mask_generator.generate(image)
-end_event.record()
-torch.cuda.synchronize()
-print(start_event.elapsed_time(end_event) / 10.)
-
-# Save a GPU trace
-profiler_runner(f"amg_example_trace.json.gz", mask_generator.generate, image)
-
-# Write out memory usage
-max_memory_allocated_bytes = torch.cuda.max_memory_allocated()
-_, total_memory = torch.cuda.mem_get_info()
-max_memory_allocated_percentage = int(100 * (max_memory_allocated_bytes / total_memory))
-max_memory_allocated_bytes = max_memory_allocated_bytes >> 20
-print(f"memory(MiB): {max_memory_allocated_bytes} memory(%): {max_memory_allocated_percentage}")
+    masks = mask_generator.generate(image)
+    masks = mask_generator.generate(image)
+    
+    # Save an example
+    plt.figure(figsize=(image.shape[1]/100., image.shape[0]/100.), dpi=100)
+    plt.imshow(image)
+    ms = show_anns(masks)
+    ms_ref = torch.load("dog_mask_fast.pt")
+    # # TODO: USE mIoU!
+    torch.testing.assert_allclose(ms, ms_ref)
+    print("Masks match reference")
+    # torch.save(ms, "dog_mask_fast.pt")
+    plt.axis('off')
+    plt.tight_layout()
+    plt.savefig('dog_mask_fast.png', format='png')
+    
+    # Benchmark
+    torch.cuda.synchronize()
+    start_event = torch.cuda.Event(enable_timing=True)
+    end_event = torch.cuda.Event(enable_timing=True)
+    start_event.record()
+    for _ in range(10):
+        masks = mask_generator.generate(image)
+    end_event.record()
+    torch.cuda.synchronize()
+    print(start_event.elapsed_time(end_event) / 10.)
+    
+    # Save a GPU trace
+    profiler_runner(f"amg_example_trace.json.gz", mask_generator.generate, image)
+    
+    # Write out memory usage
+    max_memory_allocated_bytes = torch.cuda.max_memory_allocated()
+    _, total_memory = torch.cuda.mem_get_info()
+    max_memory_allocated_percentage = int(100 * (max_memory_allocated_bytes / total_memory))
+    max_memory_allocated_bytes = max_memory_allocated_bytes >> 20
+    print(f"memory(MiB): {max_memory_allocated_bytes} memory(%): {max_memory_allocated_percentage}")

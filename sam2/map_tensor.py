@@ -1,6 +1,7 @@
 import contextlib
 import torch
 from torch.utils._pytree import tree_map
+from typing import Dict
 
 @contextlib.contextmanager
 def no_dispatch():
@@ -318,10 +319,40 @@ def ops_impl(cls, func, types, args, kwargs=None):
             return (wrap(sdpa_res[0].view((a1_size[0],) + a0_size)),) + sdpa_res[1:]
         return NotImplemented
 
+    # Only needed by inductor for compile
+    if func == torch.ops.aten._unsafe_index.Tensor:
+        assert len(unwrapped_kwargs) == 0
+        assert len(unwrapped_args) == 2, f"args: {unwrapped_args}"
+        a = unwrapped_args[0]
+        a = unwrapped_args[0].flatten(0, 1)
+        resa = func(*((a,) + unwrapped_args[1:]))
+        resb = resa.view((unwrapped_args[0].size(0), unwrapped_args[0].size(1)) + resa.size()[1:])
+        return wrap(resb)
 
-    res = wrap(func(*unwrapped_args, **unwrapped_kwargs))
-    # import sys; sys.exit(1)
-    return res
+    forwardables = [
+                       torch.ops.aten.add.Tensor,
+                       torch.ops.aten.clamp.default,
+                       torch.ops.aten.clone.default,
+                       torch.ops.aten.copy_.default,
+                       torch.ops.aten.cos.default,
+                       torch.ops.aten.div.Tensor,
+                       torch.ops.aten.eq.Scalar,
+                       torch.ops.aten.gelu.default,
+                       torch.ops.aten.mul.Tensor,
+                       torch.ops.aten.pow.Tensor_Scalar,
+                       torch.ops.aten.relu.default,
+                       torch.ops.aten.sigmoid.default,
+                       torch.ops.aten.sin.default,
+                       torch.ops.aten.sqrt.default,
+                       torch.ops.aten.sub.Tensor,
+                       torch.ops.aten.unbind.int,
+                       torch.ops.aten.where.self,
+                       torch.ops.aten.zeros_like.default,
+                   ]
+    if func in forwardables:
+        return wrap(func(*unwrapped_args, **unwrapped_kwargs))
+    print("Not supported func: ", func)
+    return NotImplemented
 
 class MapTensor(torch.Tensor):
     @staticmethod
@@ -358,6 +389,25 @@ class MapTensor(torch.Tensor):
         return res
 
     __torch_function__ = torch._C._disabled_torch_function_impl
+
+    # flatten/unflatten is needed for compile
+    def __tensor_flatten__(self):
+        ctx = {}
+        inner_tensors = ["elems"]
+        return inner_tensors, ctx
+
+    @staticmethod
+    def __tensor_unflatten__(inner_tensors: Dict, meta, outer_size, outer_stride):
+        from torch._subclasses.fake_tensor import FakeTensor
+
+        # inner tensors: _values, _offsets, [_lengths], [_min_seqlen], [_max_seqlen]
+        assert len(inner_tensors) == 1, f"{inner_tensors}"
+        elems = inner_tensors["elems"]
+
+        return MapTensor(elems)
+
+    def __repr__(self):
+        return f"MapTensor({self.elems.size()})"
 
 # ts is a higher dim Tensor
 def to_map_tensor(ts: torch.Tensor):

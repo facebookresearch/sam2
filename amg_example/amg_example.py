@@ -67,7 +67,21 @@ mask_generator = SAM2AutomaticMaskGenerator(sam2)
 #     fullgraph=True,
 #     dynamic=False,
 # )
-# 
+
+# mask_generator.predictor.model.sam_mask_decoder.transformer = torch.compile(
+#     mask_generator.predictor.model.sam_mask_decoder.transformer,
+#     mode="max-autotune-no-cudagraphs",
+#     fullgraph=True,
+#     dynamic=False,
+# )
+
+mask_generator.predictor._predict = torch.compile(
+    mask_generator.predictor._predict,
+    mode="max-autotune-no-cudagraphs",
+    fullgraph=True,
+    dynamic=False,
+)
+
 # ### ---
 
 
@@ -81,7 +95,7 @@ plt.figure(figsize=(image.shape[1]/100., image.shape[0]/100.), dpi=100)
 plt.imshow(image)
 ms = show_anns(masks)
 ms_ref = torch.load("dog_mask_fast.pt")
-# TODO: USE mIoU!
+# # TODO: USE mIoU!
 torch.testing.assert_allclose(ms, ms_ref)
 print("Masks match reference")
 # torch.save(ms, "dog_mask_fast.pt")

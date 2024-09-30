@@ -210,7 +210,8 @@ class MaskDecoder(nn.Module):
         b, c, h, w = src.shape
 
         # Run the transformer
-        hs, src = self.transformer(src, pos_src, tokens)
+        with torch.autograd.profiler.record_function("self.transformer"):
+            hs, src = self.transformer(src, pos_src, tokens)
         iou_token_out = hs[:, s, :]
         mask_tokens_out = hs[:, s + 1 : (s + 1 + self.num_mask_tokens), :]
 
@@ -222,23 +223,7 @@ class MaskDecoder(nn.Module):
             dc1, ln1, act1, dc2, act2 = self.output_upscaling
             feat_s0, feat_s1 = high_res_features
             upscaled_embedding = act1(ln1(dc1(src) + feat_s1))
-            # a = dc1(src)
-            # print("a.size(): ", a.size())
-            # b = a + feat_s1
-            # print("b.size(): ", b.size())
-            # c = ln1(b)
-            # print("c.size(): ", c.size())
-            # d = act1(c)
-            # print("d.size(): ", d.size())
-            # upscaled_embedding = d
             upscaled_embedding = act2(dc2(upscaled_embedding) + feat_s0)
-            # e = dc2(upscaled_embedding)
-            # print("e.size(): ", e.size())
-            # f = e + feat_s0
-            # print("f.size(): ", f.size())
-            # g = act2(f)
-            # print("g.size(): ", g.size())
-            # upscaled_embedding = g
 
         hyper_in_list: List[torch.Tensor] = []
         for i in range(self.num_mask_tokens):

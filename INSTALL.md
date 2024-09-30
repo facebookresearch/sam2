@@ -68,6 +68,28 @@ to manually add `sam2_configs` into your Python's `sys.path`.
 
 <details>
 <summary>
+I got `RuntimeError: Error(s) in loading state_dict for SAM2Base` when loading the new SAM 2.1 checkpoints
+</summary>
+<br/>
+
+This is likely because you have installed a previous version of this repo, which doesn't have the new modules to support the SAM 2.1 checkpoints yet. Please try the following steps:
+
+1. pull the latest code from the `main` branch of this repo
+2. run `pip uninstall -y SAM-2` to uninstall any previous installations
+3. then install the latest repo again using `pip install -e ".[notebooks]"`
+
+In case the steps above still don't resolve the error, please try running in your Python environment the following
+```python
+from sam2.modeling import sam2_base
+
+print(sam2_base.__file__)
+```
+and check whether the content in the printed local path of `sam2/modeling/sam2_base.py` matches the latest one in https://github.com/facebookresearch/segment-anything-2/blob/main/sam2/modeling/sam2_base.py (e.g. whether your local file has `no_obj_embed_spatial`) to indentify if you're still using a previous installation.
+
+</details>
+
+<details>
+<summary>
 My installation failed with `CUDA_HOME environment variable is not set`
 </summary>
 <br/>

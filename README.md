@@ -12,6 +12,15 @@
 
 ![SA-V dataset](assets/sa_v_dataset.jpg?raw=true)
 
+## Latest updates
+
+**09/30/2024 -- SAM 2.1 Developer Suite (new checkpoints, training code, web demo) is released**
+
+- A new suite of improved model checkpoints (denoted as **SAM 2.1**) are released. See [Model Description](#model-description) for details.
+  * To use the new SAM 2.1 checkpoints, you need the latest model code from this repo. If you have installed an earlier version of this repo, please first uninstall the previous version via `pip uninstall SAM-2`, pull the latest code from this repo (with `git pull`), and then reinstall the repo following [Installation](#installation) below.
+- The training (and fine-tuning) code has been released. See [`training/README.md`](training/README.md) on how to get started.
+- The frontend + backend code for the SAM 2 web demo has been released. See [`demo/README.md`](demo/README.md) for details.
+
 ## Installation
 
 SAM 2 needs to be installed first before use. The code requires `python>=3.10`, as well as `torch>=2.3.1` and `torchvision>=0.18.1`. Please follow the instructions [here](https://pytorch.org/get-started/locally/) to install both PyTorch and TorchVision dependencies. You can install SAM 2 on a GPU machine using:
@@ -174,6 +183,10 @@ See [sav_dataset/README.md](sav_dataset/README.md) for details.
 ## Training SAM 2
 
 You can train or fine-tune SAM 2 on custom datasets of images, videos, or both. Please check the training [README](training/README.md) on how to get started.
+
+## Web demo for SAM 2
+
+We have released the frontend + backend code for the SAM 2 web demo (a locally deployable version similar to https://sam2.metademolab.com/demo). Please see the web demo [README](demo/README.md) for details.
 
 ## License
 

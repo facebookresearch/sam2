@@ -25,7 +25,7 @@ export const RESEARCH_BY_META_AI = 'By Meta FAIR';
 export const DEMO_FRIENDLY_NAME = 'Segment Anything 2 Demo';
 export const VIDEO_WATERMARK_TEXT = `Modified with ${DEMO_FRIENDLY_NAME}`;
 export const PROJECT_GITHUB_URL =
-  'https://github.com/facebookresearch/segment-anything-2';
+  'https://github.com/facebookresearch/sam2';
 export const AIDEMOS_URL = 'https://aidemos.meta.com';
 export const ABOUT_URL = 'https://ai.meta.com/sam2';
 export const EMAIL_ADDRESS = 'segment-anything@meta.com';

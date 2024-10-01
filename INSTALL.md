@@ -9,13 +9,13 @@
 
 Then, install SAM 2 from the root of this repository via
 ```bash
-pip install -e ".[demo]"
+pip install -e ".[notebooks]"
 ```
 
 Note that you may skip building the SAM 2 CUDA extension during installation via environment variable `SAM2_BUILD_CUDA=0`, as follows:
 ```bash
 # skip the SAM 2 CUDA extension
-SAM2_BUILD_CUDA=0 pip install -e ".[demo]"
+SAM2_BUILD_CUDA=0 pip install -e ".[notebooks]"
 ```
 This would also skip the post-processing step at runtime (removing small holes and sprinkles in the output masks, which requires the CUDA extension), but shouldn't affect the results in most cases.
 
@@ -29,7 +29,7 @@ If you would like to enable this post-processing step, you can reinstall SAM 2 o
 ```bash
 pip uninstall -y SAM-2 && \
 rm -f ./sam2/*.so && \
-SAM2_BUILD_ALLOW_ERRORS=0 pip install -v -e ".[demo]"
+SAM2_BUILD_ALLOW_ERRORS=0 pip install -v -e ".[notebooks]"
 ```
 
 Note that PyTorch needs to be installed first before building the SAM 2 CUDA extension. It's also necessary to install [CUDA toolkits](https://developer.nvidia.com/cuda-toolkit-archive) that match the CUDA version for your PyTorch installation. (This should typically be CUDA 12.1 if you follow the default installation command.) After installing the CUDA toolkits, you can check its version via `nvcc --version`.
@@ -46,23 +46,45 @@ I got `ImportError: cannot import name '_C' from 'sam2'`
 </summary>
 <br/>
 
-This is usually because you haven't run the `pip install -e ".[demo]"` step above or the installation failed. Please install SAM 2 first, and see the other issues if your installation fails.
+This is usually because you haven't run the `pip install -e ".[notebooks]"` step above or the installation failed. Please install SAM 2 first, and see the other issues if your installation fails.
 
-In some systems, you may need to run `python setup.py build_ext --inplace` in the SAM 2 repo root as suggested in https://github.com/facebookresearch/segment-anything-2/issues/77.
+In some systems, you may need to run `python setup.py build_ext --inplace` in the SAM 2 repo root as suggested in https://github.com/facebookresearch/sam2/issues/77.
 </details>
 
 <details>
 <summary>
-I got `MissingConfigException: Cannot find primary config 'sam2_hiera_l.yaml'`
+I got `MissingConfigException: Cannot find primary config 'configs/sam2.1/sam2.1_hiera_l.yaml'`
 </summary>
 <br/>
 
-This is usually because you haven't run the `pip install -e .` step above, so `sam2_configs` isn't in your Python's `sys.path`. Please run this installation step. In case it still fails after the installation step, you may try manually adding the root of this repo to `PYTHONPATH` via
+This is usually because you haven't run the `pip install -e .` step above, so `sam2` isn't in your Python's `sys.path`. Please run this installation step. In case it still fails after the installation step, you may try manually adding the root of this repo to `PYTHONPATH` via
 ```bash
-export SAM2_REPO_ROOT=/path/to/segment-anything-2  # path to this repo
+export SAM2_REPO_ROOT=/path/to/sam2  # path to this repo
 export PYTHONPATH="${SAM2_REPO_ROOT}:${PYTHONPATH}"
 ```
 to manually add `sam2_configs` into your Python's `sys.path`.
+
+</details>
+
+<details>
+<summary>
+I got `RuntimeError: Error(s) in loading state_dict for SAM2Base` when loading the new SAM 2.1 checkpoints
+</summary>
+<br/>
+
+This is likely because you have installed a previous version of this repo, which doesn't have the new modules to support the SAM 2.1 checkpoints yet. Please try the following steps:
+
+1. pull the latest code from the `main` branch of this repo
+2. run `pip uninstall -y SAM-2` to uninstall any previous installations
+3. then install the latest repo again using `pip install -e ".[notebooks]"`
+
+In case the steps above still don't resolve the error, please try running in your Python environment the following
+```python
+from sam2.modeling import sam2_base
+
+print(sam2_base.__file__)
+```
+and check whether the content in the printed local path of `sam2/modeling/sam2_base.py` matches the latest one in https://github.com/facebookresearch/sam2/blob/main/sam2/modeling/sam2_base.py (e.g. whether your local file has `no_obj_embed_spatial`) to indentify if you're still using a previous installation.
 
 </details>
 
@@ -101,7 +123,7 @@ This usually happens because you have multiple versions of dependencies (PyTorch
 
 In particular, if you have a lower PyTorch version than 2.3.1, it's recommended to upgrade to PyTorch 2.3.1 or higher first. Otherwise, the installation script will try to upgrade to the latest PyTorch using `pip`, which could sometimes lead to duplicated PyTorch installation if you have previously installed another PyTorch version using `conda`.
 
-We have been building SAM 2 against PyTorch 2.3.1 internally. However, a few user comments (e.g. https://github.com/facebookresearch/segment-anything-2/issues/22, https://github.com/facebookresearch/segment-anything-2/issues/14) suggested that downgrading to PyTorch 2.1.0 might resolve this problem. In case the error persists, you may try changing the restriction from `torch>=2.3.1` to `torch>=2.1.0` in both [`pyproject.toml`](pyproject.toml) and [`setup.py`](setup.py) to allow PyTorch 2.1.0.
+We have been building SAM 2 against PyTorch 2.3.1 internally. However, a few user comments (e.g. https://github.com/facebookresearch/sam2/issues/22, https://github.com/facebookresearch/sam2/issues/14) suggested that downgrading to PyTorch 2.1.0 might resolve this problem. In case the error persists, you may try changing the restriction from `torch>=2.3.1` to `torch>=2.1.0` in both [`pyproject.toml`](pyproject.toml) and [`setup.py`](setup.py) to allow PyTorch 2.1.0.
 </details>
 
 <details>
@@ -146,7 +168,7 @@ You may see error log of:
 > unsupported Microsoft Visual Studio version! Only the versions between 2017 and 2022 (inclusive) are supported! The nvcc flag '-allow-unsupported-compiler' can be used to override this version check; however, using an unsupported host compiler may cause compilation failure or incorrect run time execution. Use at your own risk.
 
 This is probably because your versions of CUDA and Visual Studio are incompatible. (see also https://stackoverflow.com/questions/78515942/cuda-compatibility-with-visual-studio-2022-version-17-10 for a discussion in stackoverflow).<br> 
-You may be able to fix this by adding the `-allow-unsupported-compiler` argument to `nvcc` after L48 in the [setup.py](https://github.com/facebookresearch/segment-anything-2/blob/main/setup.py). <br>
+You may be able to fix this by adding the `-allow-unsupported-compiler` argument to `nvcc` after L48 in the [setup.py](https://github.com/facebookresearch/sam2/blob/main/setup.py). <br>
 After adding the argument, `get_extension()` will look like this:
 ```python
 def get_extensions():

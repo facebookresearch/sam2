@@ -71,6 +71,7 @@ class FpnNeck(nn.Module):
         self.position_encoding = position_encoding
         self.convs = nn.ModuleList()
         self.backbone_channel_list = backbone_channel_list
+        self.d_model = d_model
         for dim in backbone_channel_list:
             current = nn.Sequential()
             current.add_module(

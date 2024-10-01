@@ -1,0 +1,105 @@
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+input AddPointsInput {
+  sessionId: String!
+  frameIndex: Int!
+  clearOldPoints: Boolean!
+  objectId: Int!
+  labels: [Int!]!
+  points: [[Float!]!]!
+}
+
+type CancelPropagateInVideo {
+  success: Boolean!
+}
+
+input CancelPropagateInVideoInput {
+  sessionId: String!
+}
+
+input ClearPointsInFrameInput {
+  sessionId: String!
+  frameIndex: Int!
+  objectId: Int!
+}
+
+type ClearPointsInVideo {
+  success: Boolean!
+}
+
+input ClearPointsInVideoInput {
+  sessionId: String!
+}
+
+type CloseSession {
+  success: Boolean!
+}
+
+input CloseSessionInput {
+  sessionId: String!
+}
+
+type Mutation {
+  startSession(input: StartSessionInput!): StartSession!
+  closeSession(input: CloseSessionInput!): CloseSession!
+  addPoints(input: AddPointsInput!): RLEMaskListOnFrame!
+  clearPointsInFrame(input: ClearPointsInFrameInput!): RLEMaskListOnFrame!
+  clearPointsInVideo(input: ClearPointsInVideoInput!): ClearPointsInVideo!
+  removeObject(input: RemoveObjectInput!): [RLEMaskListOnFrame!]!
+  cancelPropagateInVideo(
+    input: CancelPropagateInVideoInput!
+  ): CancelPropagateInVideo!
+}
+
+input PingInput {
+  sessionId: String!
+}
+
+type Pong {
+  success: Boolean!
+}
+
+type Query {
+  ping(input: PingInput!): Pong!
+}
+
+type RLEMask {
+  size: [Int!]!
+  counts: String!
+  order: String!
+}
+
+type RLEMaskForObject {
+  objectId: Int!
+  rleMask: RLEMask!
+}
+
+type RLEMaskListOnFrame {
+  frameIndex: Int!
+  rleMaskList: [RLEMaskForObject!]!
+}
+
+input RemoveObjectInput {
+  sessionId: String!
+  objectId: Int!
+}
+
+type StartSession {
+  sessionId: String!
+}
+
+input StartSessionInput {
+  path: String!
+}

@@ -47,7 +47,7 @@ EXTRA_PACKAGES = {
         "gunicorn>=23.0.0",
         "imagesize>=1.4.1",
         "pycocotools>=2.0.8",
-        "strawberry-graphql>=0.239.2",
+        "strawberry-graphql>=0.243.0",
     ],
     "dev": [
         "black==24.2.0",

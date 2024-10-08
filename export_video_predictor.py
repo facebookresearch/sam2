@@ -99,9 +99,14 @@ ann_obj_id = 1  # give a unique id to each object we interact with (it can be an
 
 # Let's add a 2nd positive click at (x, y) = (250, 220) to refine the mask
 # sending all clicks (and their labels) to `add_new_points_or_box`
-points = np.array([[210, 350], [250, 220]], dtype=np.float32)
 # for labels, `1` means positive click and `0` means negative click
-labels = np.array([1, 1], np.int32)
+if args.framework == "tflite":
+    points = np.array([[210, 350]], dtype=np.float32)
+    labels = np.array([1], np.int32)
+else:
+    points = np.array([[210, 350], [250, 220]], dtype=np.float32)
+    labels = np.array([1, 1], np.int32)
+
 _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(
     inference_state=inference_state,
     frame_idx=ann_frame_idx,
@@ -110,6 +115,8 @@ _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(
     labels=labels,
     import_from_onnx=import_from_onnx,
     export_to_onnx=export_to_onnx,
+    import_from_tflite=import_from_tflite,
+    export_to_tflite=export_to_tflite,
     model_id=model_id
 )
 

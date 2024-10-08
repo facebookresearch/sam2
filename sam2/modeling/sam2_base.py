@@ -464,8 +464,8 @@ class SAM2Base(torch.nn.Module):
             prompt_encoder.invoke()
 
             sparse_embeddings = prompt_encoder.get_tensor(output_details[1]["index"])
-            dense_embeddings = prompt_encoder.get_tensor(output_details[2]["index"])
-            dense_pe = prompt_encoder.get_tensor(output_details[0]["index"])
+            dense_embeddings = prompt_encoder.get_tensor(output_details[0]["index"])
+            dense_pe = prompt_encoder.get_tensor(output_details[2]["index"])
 
             mask_decoder.allocate_tensors()
             input_details = mask_decoder.get_input_details()

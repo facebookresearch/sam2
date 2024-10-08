@@ -23,7 +23,8 @@ tflite
 ```
 torch 2.4.0
 ai-edge-torch 0.2.0
-tf-nightly 2.18.0.dev20240905
+tf-nightly 2.18.0.dev20240811 for image mode
+tf-nightly 2.18.0.dev20240905 for video mode
 ```
 
 ## Export and Inference

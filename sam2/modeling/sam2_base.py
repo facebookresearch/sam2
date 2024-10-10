@@ -194,7 +194,10 @@ class SAM2Base(torch.nn.Module):
                 fullgraph=True,
                 dynamic=False,
             )
-        
+
+        # debug
+        self.debug = False
+         
         # onnx
         self.image_encoder_onnx = None
         self.prompt_encoder_onnx = None
@@ -202,6 +205,14 @@ class SAM2Base(torch.nn.Module):
         self.mlp_onnx = None
         self.memory_attention_onnx = None
         self.memory_encoder_onnx = None
+
+        # tflite
+        self.image_encoder_tflite = None
+        self.prompt_encoder_tflite = None
+        self.mask_decoder_tflite = None
+        self.mlp_tflite = None
+        self.memory_attention_tflite = None
+        self.memory_encoder_tflite = None
 
         # Check decoder sample parameter
         assert(self.image_size == 512 or self.image_size == 1024)
@@ -403,9 +414,8 @@ class SAM2Base(torch.nn.Module):
             masks_enable = torch.tensor([1], dtype=torch.int)
 
         if import_from_onnx:
-            print("begin prompt encoder onnx")
-            if sam_mask_prompt != None:
-                raise("currently not supported mask prompt")
+            if self.debug:
+                print("begin prompt encoder onnx")
             import onnxruntime
             if self.prompt_encoder_onnx == None:
                 self.prompt_encoder_onnx = onnxruntime.InferenceSession("model/prompt_encoder_"+model_id+".onnx")
@@ -416,15 +426,16 @@ class SAM2Base(torch.nn.Module):
 
             if self.mask_decoder_onnx == None:
                 self.mask_decoder_onnx  = onnxruntime.InferenceSession("model/mask_decoder_"+model_id+".onnx")
-           # print("backbone_features", backbone_features.shape)
-            print("begin mask decoder onnx")
-            print("begin mask decoder onnx")
-            print("backbone_features", np.sum(backbone_features.numpy()))
-            print("image_pe", np.sum(dense_pe.numpy()))
-            print("sparse_embeddings", np.sum(sparse_embeddings.numpy()))
-            print("dense_embeddings", np.sum(dense_embeddings.numpy()))
-            print("high_res_features", np.sum(high_res_features[0].numpy()))
-            print("high_res_features", np.sum(high_res_features[1].numpy()))
+            if self.debug:
+                print("backbone_features", backbone_features.shape)
+                print("begin mask decoder onnx")
+                print("begin mask decoder onnx")
+                print("backbone_features", np.sum(backbone_features.numpy()))
+                print("image_pe", np.sum(dense_pe.numpy()))
+                print("sparse_embeddings", np.sum(sparse_embeddings.numpy()))
+                print("dense_embeddings", np.sum(dense_embeddings.numpy()))
+                print("high_res_features", np.sum(high_res_features[0].numpy()))
+                print("high_res_features", np.sum(high_res_features[1].numpy()))
             masks, iou_pred, sam_tokens_out, object_score_logits  = self.mask_decoder_onnx.run(None, {
                 "image_embeddings":backbone_features.numpy(),
                 "image_pe": dense_pe.numpy(),
@@ -438,73 +449,81 @@ class SAM2Base(torch.nn.Module):
             sam_tokens_out = torch.Tensor(sam_tokens_out)
             object_score_logits = torch.Tensor(object_score_logits)
             low_res_multimasks, ious, sam_output_tokens, object_score_logits  = self.sam_mask_decoder.forward_postprocess(masks, iou_pred, sam_tokens_out, object_score_logits, multimask_output)
-            print(low_res_multimasks.shape)
-            print(ious.shape)
-            print(sam_output_tokens.shape)
-            print(object_score_logits.shape)
+            #print(low_res_multimasks.shape)
+            #print(ious.shape)
+            #print(sam_output_tokens.shape)
+            #print(object_score_logits.shape)
 
         if import_from_tflite:
+            if self.debug:
+                print("begin prompt encoder tflite")
+
             import tensorflow as tf
-            prompt_encoder = tf.lite.Interpreter(model_path="model/prompt_encoder_"+model_id+".tflite")
-            mask_decoder = tf.lite.Interpreter(model_path="model/mask_decoder_"+model_id+".tflite")
+            if self.prompt_encoder_tflite == None:
+                self.prompt_encoder_tflite = tf.lite.Interpreter(model_path="model/prompt_encoder_"+model_id+".tflite")
+                input_details = self.prompt_encoder_tflite.get_input_details()
+                self.prompt_encoder_tflite.resize_tensor_input(
+                    input_details[2]["index"], 
+                    [1, sam_point_coords.shape[1], 2]
+                )
+                self.prompt_encoder_tflite.allocate_tensors()
 
-            prompt_encoder.allocate_tensors()
-            input_details = prompt_encoder.get_input_details()
-            output_details = prompt_encoder.get_output_details()
-            prompt_encoder.resize_tensor_input(
-                input_details[2]["index"], 
-                [1, sam_point_coords.shape[1], 2]
-            )
-            prompt_encoder.allocate_tensors()
+            input_details = self.prompt_encoder_tflite.get_input_details()
+            output_details = self.prompt_encoder_tflite.get_output_details()
 
-            prompt_encoder.set_tensor(input_details[2]["index"], sam_point_coords)
-            prompt_encoder.set_tensor(input_details[3]["index"], sam_point_labels)
-            prompt_encoder.set_tensor(input_details[0]["index"], mask_input_dummy)
-            prompt_encoder.set_tensor(input_details[1]["index"], masks_enable)
-            prompt_encoder.invoke()
+            self.prompt_encoder_tflite.set_tensor(input_details[2]["index"], sam_point_coords)
+            self.prompt_encoder_tflite.set_tensor(input_details[3]["index"], sam_point_labels)
+            self.prompt_encoder_tflite.set_tensor(input_details[0]["index"], mask_input_dummy)
+            self.prompt_encoder_tflite.set_tensor(input_details[1]["index"], masks_enable)
+            self.prompt_encoder_tflite.invoke()
 
-            sparse_embeddings = prompt_encoder.get_tensor(output_details[1]["index"])
-            dense_embeddings = prompt_encoder.get_tensor(output_details[0]["index"])
-            dense_pe = prompt_encoder.get_tensor(output_details[2]["index"])
+            sparse_embeddings = self.prompt_encoder_tflite.get_tensor(output_details[1]["index"])
+            dense_embeddings = self.prompt_encoder_tflite.get_tensor(output_details[0]["index"])
+            dense_pe = self.prompt_encoder_tflite.get_tensor(output_details[2]["index"])
 
-            mask_decoder.allocate_tensors()
-            input_details = mask_decoder.get_input_details()
-            output_details = mask_decoder.get_output_details()
-            mask_decoder.resize_tensor_input(
-                input_details[1]["index"], 
-                [1, sparse_embeddings.shape[1], 256]
-            )
-            mask_decoder.allocate_tensors()
+            if self.mask_decoder_tflite == None:
+                self.mask_decoder_tflite = tf.lite.Interpreter(model_path="model/mask_decoder_"+model_id+".tflite")
+
+                input_details = self.mask_decoder_tflite.get_input_details()
+                self.mask_decoder_tflite.resize_tensor_input(
+                    input_details[1]["index"], 
+                    [1, sparse_embeddings.shape[1], 256]
+                )
+                self.mask_decoder_tflite.allocate_tensors()
+
+            input_details = self.mask_decoder_tflite.get_input_details()
+            output_details = self.mask_decoder_tflite.get_output_details()
 
             batched_mode = False
 
-            mask_decoder.set_tensor(input_details[3]["index"], backbone_features.numpy())
-            mask_decoder.set_tensor(input_details[6]["index"], dense_pe)
-            mask_decoder.set_tensor(input_details[1]["index"], sparse_embeddings)
-            mask_decoder.set_tensor(input_details[2]["index"], dense_embeddings)
-            mask_decoder.set_tensor(input_details[5]["index"], batched_mode)
-            mask_decoder.set_tensor(input_details[0]["index"], high_res_features[0].numpy())
-            mask_decoder.set_tensor(input_details[4]["index"], high_res_features[1].numpy())
-            mask_decoder.invoke()
+            self.mask_decoder_tflite.set_tensor(input_details[3]["index"], backbone_features.numpy())
+            self.mask_decoder_tflite.set_tensor(input_details[6]["index"], dense_pe)
+            self.mask_decoder_tflite.set_tensor(input_details[1]["index"], sparse_embeddings)
+            self.mask_decoder_tflite.set_tensor(input_details[2]["index"], dense_embeddings)
+            self.mask_decoder_tflite.set_tensor(input_details[5]["index"], batched_mode)
+            self.mask_decoder_tflite.set_tensor(input_details[0]["index"], high_res_features[0].numpy())
+            self.mask_decoder_tflite.set_tensor(input_details[4]["index"], high_res_features[1].numpy())
+            self.mask_decoder_tflite.invoke()
 
-            masks = mask_decoder.get_tensor(output_details[2]["index"])
-            iou_pred = mask_decoder.get_tensor(output_details[0]["index"])
-            sam_tokens_out = mask_decoder.get_tensor(output_details[3]["index"])
-            object_score_logits = mask_decoder.get_tensor(output_details[1]["index"])
+            masks = self.mask_decoder_tflite.get_tensor(output_details[2]["index"])
+            iou_pred = self.mask_decoder_tflite.get_tensor(output_details[0]["index"])
+            sam_tokens_out = self.mask_decoder_tflite.get_tensor(output_details[3]["index"])
+            object_score_logits = self.mask_decoder_tflite.get_tensor(output_details[1]["index"])
 
             masks = torch.Tensor(masks)
             iou_pred = torch.Tensor(iou_pred)
             sam_tokens_out = torch.Tensor(sam_tokens_out)
             object_score_logits = torch.Tensor(object_score_logits)
             low_res_multimasks, ious, sam_output_tokens, object_score_logits  = self.sam_mask_decoder.forward_postprocess(masks, iou_pred, sam_tokens_out, object_score_logits, multimask_output)
-            print(low_res_multimasks.shape)
-            print(ious.shape)
-            print(sam_output_tokens.shape)
-            print(object_score_logits.shape)
+            #print(low_res_multimasks.shape)
+            #print(ious.shape)
+            #print(sam_output_tokens.shape)
+            #print(object_score_logits.shape)
 
         if not import_from_onnx and not import_from_tflite:
-            print("begin mask decoder torch")
-            print("backbone_features", backbone_features.shape)
+            if self.debug:
+                print("begin mask decoder torch")
+                print("backbone_features", backbone_features.shape)
             if sam_mask_prompt is None:
                 import numpy as np
                 mask_input_dummy = torch.Tensor(np.zeros((1, self.image_size // 4, self.image_size // 4)))
@@ -534,10 +553,11 @@ class SAM2Base(torch.nn.Module):
                 high_res_features1=high_res_features[0],
                 high_res_features2=high_res_features[1],
             )
-            print(low_res_multimasks.shape)
-            print(ious.shape)
-            print(sam_output_tokens.shape)
-            print(object_score_logits.shape)
+            if self.debug:
+                print(low_res_multimasks.shape)
+                print(ious.shape)
+                print(sam_output_tokens.shape)
+                print(object_score_logits.shape)
 
         if self.pred_obj_scores:
             is_obj_appearing = object_score_logits > 0
@@ -606,16 +626,17 @@ class SAM2Base(torch.nn.Module):
 
         if import_from_tflite:
             import tensorflow as tf
-            mlp = tf.lite.Interpreter(model_path="model/mlp_"+model_id+".tflite")
-            mlp.allocate_tensors()
-            input_details = mlp.get_input_details()
-            output_details = mlp.get_output_details()
-            mlp.allocate_tensors()
+            if self.mlp_tflite == None:
+                self.mlp_tflite = tf.lite.Interpreter(model_path="model/mlp_"+model_id+".tflite")
+                self.mlp_tflite.allocate_tensors()
 
-            mlp.set_tensor(input_details[0]["index"], sam_output_token.numpy())
-            mlp.invoke()
+            input_details = self.mlp_tflite.get_input_details()
+            output_details = self.mlp_tflite.get_output_details()
 
-            obj_ptr = mlp.get_tensor(output_details[0]["index"])
+            self.mlp_tflite.set_tensor(input_details[0]["index"], sam_output_token.numpy())
+            self.mlp_tflite.invoke()
+
+            obj_ptr = self.mlp_tflite.get_tensor(output_details[0]["index"])
             obj_ptr = torch.Tensor(obj_ptr)
 
         if not import_from_onnx and not import_from_tflite:
@@ -910,12 +931,13 @@ class SAM2Base(torch.nn.Module):
         memory_pos_embed_1 = memory_pos_embed[:-num_obj_ptr_tokens,:,:]
         memory_pos_embed_2 = memory_pos_embed[-num_obj_ptr_tokens:,:,:]
 
-        print("memory attention shape")
-        print("curr", current_vision_feats[0].shape)
-        print("memory", memory.shape)
-        print("curr_pos", current_vision_pos_embeds[0].shape)
-        print("memory_pos", memory_pos_embed.shape)
-        print("num_obj_ptr_tokens", num_obj_ptr_tokens)
+        if self.debug:
+            print("memory attention shape")
+            print("curr", current_vision_feats[0].shape)
+            print("memory", memory.shape)
+            print("curr_pos", current_vision_pos_embeds[0].shape)
+            print("memory_pos", memory_pos_embed.shape)
+            print("num_obj_ptr_tokens", num_obj_ptr_tokens)
 
         if export_to_onnx and not self.memory_attention_onnx_exported:
             self.memory_attention_onnx_exported = True
@@ -943,7 +965,8 @@ class SAM2Base(torch.nn.Module):
             #onnx_program.save('model/memory_attention_'+model_id+'.onnx')
 
         if import_from_onnx:
-            print("begin memory attention onnx")
+            if self.debug:
+                print("begin memory attention onnx")
             import onnxruntime
             if self.memory_attention_onnx == None:
                 self.memory_attention_onnx = onnxruntime.InferenceSession("model/memory_attention_"+model_id+".opt.onnx")
@@ -983,40 +1006,43 @@ class SAM2Base(torch.nn.Module):
             edge_model.export("model/memory_attention_"+model_id+".tflite")
 
         if import_from_tflite:
+            if self.debug:
+                print("begin memory attention tflite")
             import tensorflow as tf
-            import os
-            #os.environ['TF_ENABLE_XNNPACK'] = '0'
-            memory_attention = tf.lite.Interpreter(model_path="model/memory_attention_"+model_id+".tflite")
-            #memory_attention.allocate_tensors()
-            input_details = memory_attention.get_input_details()
-            output_details = memory_attention.get_output_details()
-            memory_attention.resize_tensor_input(
-                input_details[5]["index"], 
-                [memory_1.shape[0], 1, 64]
-            )
-            memory_attention.resize_tensor_input(
-                input_details[1]["index"], 
-                [memory_2.shape[0], 1, 64]
-            )
-            memory_attention.resize_tensor_input(
-                input_details[4]["index"], 
-                [memory_pos_embed_1.shape[0], 1, 64]
-            )
-            memory_attention.resize_tensor_input(
-                input_details[0]["index"], 
-                [memory_pos_embed_2.shape[0], 1, 64]
-            )
-            memory_attention.allocate_tensors()
+            if self.memory_attention_tflite == None:
+                self.memory_attention_tflite = tf.lite.Interpreter(model_path="model/memory_attention_"+model_id+".tflite")
+                self.memory_attention_tflite.allocate_tensors()
+                input_details = self.memory_attention_tflite.get_input_details()
+                self.memory_attention_tflite.resize_tensor_input(
+                    input_details[5]["index"], 
+                    [memory_1.shape[0], 1, 64]
+                )
+                self.memory_attention_tflite.resize_tensor_input(
+                    input_details[1]["index"], 
+                    [memory_2.shape[0], 1, 64]
+                )
+                self.memory_attention_tflite.resize_tensor_input(
+                    input_details[4]["index"], 
+                    [memory_pos_embed_1.shape[0], 1, 64]
+                )
+                self.memory_attention_tflite.resize_tensor_input(
+                    input_details[0]["index"], 
+                    [memory_pos_embed_2.shape[0], 1, 64]
+                )
+                self.memory_attention_tflite.allocate_tensors()
 
-            memory_attention.set_tensor(input_details[3]["index"], current_vision_feats[0].numpy())
-            memory_attention.set_tensor(input_details[5]["index"], memory_1.numpy())
-            memory_attention.set_tensor(input_details[1]["index"], memory_2.numpy())
-            memory_attention.set_tensor(input_details[2]["index"], current_vision_pos_embeds[0].numpy())
-            memory_attention.set_tensor(input_details[4]["index"], memory_pos_embed_1.numpy())
-            memory_attention.set_tensor(input_details[0]["index"], memory_pos_embed_2.numpy())
-            memory_attention.invoke()
+            input_details = self.memory_attention_tflite.get_input_details()
+            output_details = self.memory_attention_tflite.get_output_details()
 
-            pix_feat_with_mem = memory_attention.get_tensor(output_details[0]["index"])
+            self.memory_attention_tflite.set_tensor(input_details[3]["index"], current_vision_feats[0].numpy())
+            self.memory_attention_tflite.set_tensor(input_details[5]["index"], memory_1.numpy())
+            self.memory_attention_tflite.set_tensor(input_details[1]["index"], memory_2.numpy())
+            self.memory_attention_tflite.set_tensor(input_details[2]["index"], current_vision_pos_embeds[0].numpy())
+            self.memory_attention_tflite.set_tensor(input_details[4]["index"], memory_pos_embed_1.numpy())
+            self.memory_attention_tflite.set_tensor(input_details[0]["index"], memory_pos_embed_2.numpy())
+            self.memory_attention_tflite.invoke()
+
+            pix_feat_with_mem = self.memory_attention_tflite.get_tensor(output_details[0]["index"])
             pix_feat_with_mem = torch.Tensor(pix_feat_with_mem)
 
         if not import_from_onnx and not import_from_tflite:
@@ -1086,7 +1112,8 @@ class SAM2Base(torch.nn.Module):
             )
 
         if import_from_onnx:
-            print("begin memory encoder onnx")
+            if self.debug:
+                print("begin memory encoder onnx")
             import onnxruntime
             if self.memory_encoder_onnx == None:
                 self.memory_encoder_onnx = onnxruntime.InferenceSession("model/memory_encoder_"+model_id+".onnx")
@@ -1104,24 +1131,28 @@ class SAM2Base(torch.nn.Module):
             edge_model.export("model/memory_encoder_"+model_id+".tflite")
 
         if import_from_tflite:
+            if self.debug:
+                print("begin memory encoder tflite")
             import tensorflow as tf
-            memory_encoder = tf.lite.Interpreter(model_path="model/memory_encoder_"+model_id+".tflite")
-            memory_encoder.allocate_tensors()
-            input_details = memory_encoder.get_input_details()
-            output_details = memory_encoder.get_output_details()
-            memory_encoder.allocate_tensors()
+            if self.memory_encoder_tflite == None:
+                self.memory_encoder_tflite = tf.lite.Interpreter(model_path="model/memory_encoder_"+model_id+".tflite")
+                self.memory_encoder_tflite.allocate_tensors()
 
-            memory_encoder.set_tensor(input_details[0]["index"], pix_feat.numpy())
-            memory_encoder.set_tensor(input_details[1]["index"], mask_for_mem.numpy())
-            memory_encoder.invoke()
+            input_details = self.memory_encoder_tflite.get_input_details()
+            output_details = self.memory_encoder_tflite.get_output_details()
 
-            vision_features = memory_encoder.get_tensor(output_details[1]["index"])
-            vision_pos_enc = memory_encoder.get_tensor(output_details[0]["index"])
+            self.memory_encoder_tflite.set_tensor(input_details[0]["index"], pix_feat.numpy())
+            self.memory_encoder_tflite.set_tensor(input_details[1]["index"], mask_for_mem.numpy())
+            self.memory_encoder_tflite.invoke()
+
+            vision_features = self.memory_encoder_tflite.get_tensor(output_details[1]["index"])
+            vision_pos_enc = self.memory_encoder_tflite.get_tensor(output_details[0]["index"])
             vision_features = torch.Tensor(vision_features)
             vision_pos_enc = torch.Tensor(vision_pos_enc)
 
         if not import_from_onnx and not import_from_tflite:
-            print("begin memory encoder torch")
+            if self.debug:
+                print("begin memory encoder torch")
             vision_features, vision_pos_enc = self.memory_encoder(
                 pix_feat, mask_for_mem#, skip_mask_sigmoid=True  # sigmoid already applied (fixed to constant)
             )

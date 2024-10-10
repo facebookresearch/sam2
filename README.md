@@ -49,11 +49,18 @@ python3 export_video_predictor.py --framework tflite
 onnx
 
 ```
+download_onnx_models.sh
 python3 export_image_predictor.py --framework onnx --mode import
 python3 export_video_predictor.py --framework onnx --mode import
 ```
 
-tflite not supported inference only yet.
+tflite
+
+```
+download_tflite_models.sh
+python3 export_image_predictor.py --framework tflite --mode import
+python3 export_video_predictor.py --framework tflite --mode import
+```
 
 ## Test
 

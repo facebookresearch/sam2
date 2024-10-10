@@ -68,6 +68,19 @@ class SAM2ImagePredictor:
             (sam_model.image_size // 16, sam_model.image_size // 16),
         ]
 
+        # debug
+        self.debug = False
+         
+        # onnx
+        self.image_encoder_onnx = None
+        self.prompt_encoder_onnx = None
+        self.mask_decoder_onnx = None
+
+        # tflite
+        self.image_encoder_tflite = None
+        self.prompt_encoder_tflite = None
+        self.mask_decoder_tflite = None
+
     @classmethod
     def from_pretrained(cls, model_id: str, **kwargs) -> "SAM2ImagePredictor":
         """
@@ -135,15 +148,17 @@ class SAM2ImagePredictor:
             )
         
         if import_from_onnx:
-            model = onnxruntime.InferenceSession("model/image_encoder_"+model_id+".onnx")
-            vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = model.run(None, {"input_image":input_image.numpy()})
-            print("vision_features", vision_features.shape)
-            print("vision_pos_enc_0", vision_pos_enc_0.shape)
-            print("vision_pos_enc_1", vision_pos_enc_1.shape)
-            print("vision_pos_enc_2", vision_pos_enc_2.shape)
-            print("backbone_fpn_0", backbone_fpn_0.shape)
-            print("backbone_fpn_1", backbone_fpn_1.shape)
-            print("backbone_fpn_2", backbone_fpn_2.shape)
+            if self.image_encoder_onnx == None:
+                self.image_encoder_onnx = onnxruntime.InferenceSession("model/image_encoder_"+model_id+".onnx")
+            vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = self.image_encoder_onnx.run(None, {"input_image":input_image.numpy()})
+            if self.debug:
+                print("vision_features", vision_features.shape)
+                print("vision_pos_enc_0", vision_pos_enc_0.shape)
+                print("vision_pos_enc_1", vision_pos_enc_1.shape)
+                print("vision_pos_enc_2", vision_pos_enc_2.shape)
+                print("backbone_fpn_0", backbone_fpn_0.shape)
+                print("backbone_fpn_1", backbone_fpn_1.shape)
+                print("backbone_fpn_2", backbone_fpn_2.shape)
 
         if export_to_tflite:
             import ai_edge_torch
@@ -179,10 +194,27 @@ class SAM2ImagePredictor:
                 with_quantizer.export("model/image_encoder_"+model_id+"_int8.tflite")
                 edge_model = model
 
-            if import_from_tflite:
-                vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = edge_model(input_image)
+        if import_from_tflite:
+            import tensorflow as tf
+            if self.image_encoder_tflite == None:
+                self.image_encoder_tflite = tf.lite.Interpreter(model_path="model/image_encoder_"+model_id+".tflite")
+                self.image_encoder_tflite.allocate_tensors()
 
-        if not import_from_onnx and (not import_from_tflite or not export_to_tflite):
+            input_details = self.image_encoder_tflite.get_input_details()
+            output_details = self.image_encoder_tflite.get_output_details()
+
+            self.image_encoder_tflite.set_tensor(input_details[0]["index"], input_image.numpy())
+            self.image_encoder_tflite.invoke()
+
+            vision_features = self.image_encoder_tflite.get_tensor(output_details[4]["index"])
+            vision_pos_enc_0 = self.image_encoder_tflite.get_tensor(output_details[1]["index"])
+            vision_pos_enc_1 = self.image_encoder_tflite.get_tensor(output_details[5]["index"])
+            vision_pos_enc_2 = self.image_encoder_tflite.get_tensor(output_details[3]["index"])
+            backbone_fpn_0 = self.image_encoder_tflite.get_tensor(output_details[0]["index"])
+            backbone_fpn_1 = self.image_encoder_tflite.get_tensor(output_details[2]["index"])
+            backbone_fpn_2 = self.image_encoder_tflite.get_tensor(output_details[6]["index"])
+
+        if not import_from_onnx and not import_from_tflite:
             vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = self.model.forward_image(input_image)
 
         backbone_out = {"vision_features":torch.Tensor(vision_features),
@@ -504,7 +536,6 @@ class SAM2ImagePredictor:
         else:
             mask_input_dummy = mask_input
             masks_enable = torch.tensor([1], dtype=torch.int)
-        print("mask_input_dummy", mask_input_dummy.shape)
 
         if export_to_onnx:
             #print("concat_points", concat_points.shape)
@@ -522,8 +553,9 @@ class SAM2ImagePredictor:
             )
 
         if import_from_onnx:
-            model = onnxruntime.InferenceSession("model/prompt_encoder_"+model_id+".onnx")
-            sparse_embeddings, dense_embeddings, dense_pe = model.run(None, {"coords":concat_points[0].numpy(), "labels":concat_points[1].numpy(), "masks": mask_input_dummy.numpy(), "masks_enable":masks_enable.numpy()})
+            if self.prompt_encoder_onnx == None:
+                self.prompt_encoder_onnx = onnxruntime.InferenceSession("model/prompt_encoder_"+model_id+".onnx")
+            sparse_embeddings, dense_embeddings, dense_pe = self.prompt_encoder_onnx.run(None, {"coords":concat_points[0].numpy(), "labels":concat_points[1].numpy(), "masks": mask_input_dummy.numpy(), "masks_enable":masks_enable.numpy()})
             sparse_embeddings = torch.Tensor(sparse_embeddings)
             dense_embeddings = torch.Tensor(dense_embeddings)
             dense_pe = torch.Tensor(dense_pe)
@@ -558,13 +590,36 @@ class SAM2ImagePredictor:
 
                 edge_model = model
 
-            if import_from_tflite and not tflite_int8:
-                sparse_embeddings, dense_embeddings, dense_pe = edge_model(concat_points[0], concat_points[1], mask_input_dummy, masks_enable)
-                sparse_embeddings = torch.Tensor(sparse_embeddings)
-                dense_embeddings = torch.Tensor(dense_embeddings)
-                dense_pe = torch.Tensor(dense_pe)
+        if import_from_tflite:
+            import tensorflow as tf
+            if self.prompt_encoder_tflite == None:
+                self.prompt_encoder_tflite = tf.lite.Interpreter(model_path="model/prompt_encoder_"+model_id+".tflite")
+                self.prompt_encoder_tflite.allocate_tensors()
+                input_details = self.prompt_encoder_tflite.get_input_details()
+                self.prompt_encoder_tflite.resize_tensor_input(
+                    input_details[2]["index"], 
+                    [1, concat_points[0].shape[1], 2]
+                )
+                self.prompt_encoder_tflite.allocate_tensors()
 
-        if not import_from_onnx and (not import_from_tflite or not export_to_tflite or tflite_int8):
+            input_details = self.prompt_encoder_tflite.get_input_details()
+            output_details = self.prompt_encoder_tflite.get_output_details()
+
+            self.prompt_encoder_tflite.set_tensor(input_details[2]["index"], concat_points[0])
+            self.prompt_encoder_tflite.set_tensor(input_details[3]["index"], concat_points[1])
+            self.prompt_encoder_tflite.set_tensor(input_details[0]["index"], mask_input_dummy)
+            self.prompt_encoder_tflite.set_tensor(input_details[1]["index"], masks_enable)
+            self.prompt_encoder_tflite.invoke()
+
+            sparse_embeddings = self.prompt_encoder_tflite.get_tensor(output_details[1]["index"])
+            dense_embeddings = self.prompt_encoder_tflite.get_tensor(output_details[0]["index"])
+            dense_pe = self.prompt_encoder_tflite.get_tensor(output_details[2]["index"])
+
+            sparse_embeddings = torch.Tensor(sparse_embeddings)
+            dense_embeddings = torch.Tensor(dense_embeddings)
+            dense_pe = torch.Tensor(dense_pe)
+
+        if not import_from_onnx and not import_from_tflite:
             sparse_embeddings, dense_embeddings, dense_pe = self.model.sam_prompt_encoder.forward(
                 coords=concat_points[0],
                 labels=concat_points[1],
@@ -599,8 +654,9 @@ class SAM2ImagePredictor:
             )
         
         if import_from_onnx:
-            model = onnxruntime.InferenceSession("model/mask_decoder_"+model_id+".onnx")
-            masks, iou_pred, sam_tokens_out, object_score_logits = model.run(None, {
+            if self.mask_decoder_onnx == None:
+                self.mask_decoder_onnx  = onnxruntime.InferenceSession("model/mask_decoder_"+model_id+".onnx")
+            masks, iou_pred, sam_tokens_out, object_score_logits = self.mask_decoder_onnx.run(None, {
                 "image_embeddings":self._features["image_embed"][img_idx].unsqueeze(0).numpy(),
                 "image_pe": dense_pe.numpy(),
                 "sparse_prompt_embeddings": sparse_embeddings.numpy(),
@@ -644,18 +700,49 @@ class SAM2ImagePredictor:
 
                 edge_model = model
 
-            if import_from_tflite:
-                batched_mode_np = np.zeros((1), dtype=bool)
-                if batched_mode:
-                    batched_mode_np[0] = True
-                masks, iou_pred, sam_tokens_out, object_score_logits = edge_model(self._features["image_embed"][img_idx].unsqueeze(0), dense_pe, sparse_embeddings, dense_embeddings, batched_mode_np, high_res_features[0], high_res_features[1])
-                masks = torch.Tensor(masks)
-                iou_pred = torch.Tensor(iou_pred)
-                sam_tokens_out = torch.Tensor(sam_tokens_out)
-                object_score_logits = torch.Tensor(object_score_logits)
-                low_res_masks, iou_predictions, _, _  = self.model.sam_mask_decoder.forward_postprocess(masks, iou_pred, sam_tokens_out, object_score_logits, multimask_output)
+        if import_from_tflite:
+            batched_mode_np = np.zeros((1), dtype=bool)
+            if batched_mode:
+                batched_mode_np[0] = True
 
-        if not import_from_onnx and (not import_from_tflite or not export_to_tflite):
+            import tensorflow as tf
+            if self.mask_decoder_tflite == None:
+                self.mask_decoder_tflite  = tf.lite.Interpreter(model_path="model/mask_decoder_"+model_id+".tflite")
+                self.mask_decoder_tflite.allocate_tensors()
+                input_details = self.mask_decoder_tflite.get_input_details()
+                self.mask_decoder_tflite.resize_tensor_input(
+                    input_details[1]["index"], 
+                    [1, sparse_embeddings.shape[1], 256]
+                )
+                self.mask_decoder_tflite.allocate_tensors()
+
+            input_details = self.mask_decoder_tflite.get_input_details()
+            output_details = self.mask_decoder_tflite.get_output_details()
+
+            batched_mode = False
+
+            self.mask_decoder_tflite.set_tensor(input_details[3]["index"], self._features["image_embed"][img_idx].unsqueeze(0).numpy())
+            self.mask_decoder_tflite.set_tensor(input_details[6]["index"], dense_pe)
+            self.mask_decoder_tflite.set_tensor(input_details[1]["index"], sparse_embeddings)
+            self.mask_decoder_tflite.set_tensor(input_details[2]["index"], dense_embeddings)
+            self.mask_decoder_tflite.set_tensor(input_details[5]["index"], batched_mode)
+            self.mask_decoder_tflite.set_tensor(input_details[0]["index"], high_res_features[0].numpy())
+            self.mask_decoder_tflite.set_tensor(input_details[4]["index"], high_res_features[1].numpy())
+            self.mask_decoder_tflite.invoke()
+
+            masks = self.mask_decoder_tflite.get_tensor(output_details[2]["index"])
+            iou_pred = self.mask_decoder_tflite.get_tensor(output_details[0]["index"])
+            sam_tokens_out = self.mask_decoder_tflite.get_tensor(output_details[3]["index"])
+            object_score_logits = self.mask_decoder_tflite.get_tensor(output_details[1]["index"])
+
+            masks = torch.Tensor(masks)
+            iou_pred = torch.Tensor(iou_pred)
+            sam_tokens_out = torch.Tensor(sam_tokens_out)
+            object_score_logits = torch.Tensor(object_score_logits)
+
+            low_res_masks, iou_predictions, _, _  = self.model.sam_mask_decoder.forward_postprocess(masks, iou_pred, sam_tokens_out, object_score_logits, multimask_output)
+
+        if not import_from_onnx and not import_from_tflite:
             self.model.sam_mask_decoder.forward = self.model.sam_mask_decoder.forward_normal
             masks, iou_pred, sam_tokens_out, object_score_logits = self.model.sam_mask_decoder(
                 image_embeddings=self._features["image_embed"][img_idx].unsqueeze(0),

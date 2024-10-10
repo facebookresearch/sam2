@@ -854,35 +854,38 @@ class SAM2VideoPredictor(SAM2Base):
             device = inference_state["device"]
             image = inference_state["images"][frame_idx].to(device).float().unsqueeze(0)
             if import_from_onnx:
-                print("begin image encoder onnx")
-                print(image.shape)
+                if self.debug:
+                    print("begin image encoder onnx")
                 import onnxruntime
                 if self.image_encoder_onnx == None:
                     self.image_encoder_onnx = onnxruntime.InferenceSession("model/image_encoder_"+model_id+".onnx")
                 vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = self.image_encoder_onnx.run(None, {"input_image":image.numpy()})
             
             if import_from_tflite:
-                print("begin image encoder tflite")
+                if self.debug:
+                    print("begin image encoder tflite")
                 import tensorflow as tf
-                image_encoder = tf.lite.Interpreter(model_path="model/image_encoder_"+model_id+".tflite")
-                image_encoder.allocate_tensors()
-                input_details = image_encoder.get_input_details()
-                output_details = image_encoder.get_output_details()
+                if self.image_encoder_tflite == None:
+                    self.image_encoder_tflite = tf.lite.Interpreter(model_path="model/image_encoder_"+model_id+".tflite")
+                    self.image_encoder_tflite.allocate_tensors()
 
-                image_encoder.set_tensor(input_details[0]["index"], image.numpy())
-                image_encoder.invoke()
+                input_details = self.image_encoder_tflite.get_input_details()
+                output_details = self.image_encoder_tflite.get_output_details()
 
-                vision_features = image_encoder.get_tensor(output_details[4]["index"])
-                vision_pos_enc_0 = image_encoder.get_tensor(output_details[1]["index"])
-                vision_pos_enc_1 = image_encoder.get_tensor(output_details[5]["index"])
-                vision_pos_enc_2 = image_encoder.get_tensor(output_details[3]["index"])
-                backbone_fpn_0 = image_encoder.get_tensor(output_details[0]["index"])
-                backbone_fpn_1 = image_encoder.get_tensor(output_details[2]["index"])
-                backbone_fpn_2 = image_encoder.get_tensor(output_details[6]["index"])
+                self.image_encoder_tflite.set_tensor(input_details[0]["index"], image.numpy())
+                self.image_encoder_tflite.invoke()
+
+                vision_features = self.image_encoder_tflite.get_tensor(output_details[4]["index"])
+                vision_pos_enc_0 = self.image_encoder_tflite.get_tensor(output_details[1]["index"])
+                vision_pos_enc_1 = self.image_encoder_tflite.get_tensor(output_details[5]["index"])
+                vision_pos_enc_2 = self.image_encoder_tflite.get_tensor(output_details[3]["index"])
+                backbone_fpn_0 = self.image_encoder_tflite.get_tensor(output_details[0]["index"])
+                backbone_fpn_1 = self.image_encoder_tflite.get_tensor(output_details[2]["index"])
+                backbone_fpn_2 = self.image_encoder_tflite.get_tensor(output_details[6]["index"])
 
             if not import_from_onnx and not import_from_tflite:
-                print("begin image encoder torch")
-                print(image.shape)
+                if self.debug:
+                    print("begin image encoder torch")
                 vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = self.forward_image(image)
 
             backbone_out = {"vision_features":torch.Tensor(vision_features),
@@ -894,7 +897,6 @@ class SAM2VideoPredictor(SAM2Base):
             inference_state["cached_features"] = {frame_idx: (image, backbone_out)}
 
         # expand the features to have the same dimension as the number of objects
-        print("batch_size", batch_size)
         expanded_image = image.expand(batch_size, -1, -1, -1)
         expanded_backbone_out = {
             "backbone_fpn": backbone_out["backbone_fpn"].copy(),

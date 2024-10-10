@@ -78,7 +78,7 @@ class PNGRawDataset(VOSRawDataset):
             with g_pathmgr.open(file_list_txt, "r") as f:
                 subset = [os.path.splitext(line.strip())[0] for line in f]
         else:
-            subset = os.listdir(self.img_folder)
+            subset = [folder for folder in os.listdir(self.img_folder) if os.path.isdir(os.path.join(self.img_folder, folder))]
 
         # Read and process excluded files if provided
         if excluded_videos_list_txt is not None:

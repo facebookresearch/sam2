@@ -135,7 +135,7 @@ def vos_inference(
     ]
     frame_names.sort(key=lambda p: int(os.path.splitext(p)[0]))
     inference_state = predictor.init_state(
-        video_path=video_dir, async_loading_frames=False
+        video_path=video_dir, frame_load_config=None
     )
     height = inference_state["video_height"]
     width = inference_state["video_width"]
@@ -273,7 +273,7 @@ def vos_separate_inference_per_object(
     ]
     frame_names.sort(key=lambda p: int(os.path.splitext(p)[0]))
     inference_state = predictor.init_state(
-        video_path=video_dir, async_loading_frames=False
+        video_path=video_dir, frame_load_config=None
     )
     height = inference_state["video_height"]
     width = inference_state["video_width"]

@@ -13,8 +13,8 @@ scratch:
 
 dataset:
   # PATHS to Dataset
-  img_folder: /fsx-onevision/shared/data/academic_vos_data/MOSE/train/JPEGImages # PATH to MOSE JPEGImages folder
-  gt_folder: /fsx-onevision/shared/data/academic_vos_data/MOSE/train/Annotations/  # PATH to MOSE Annotations folder
+  img_folder: null # PATH to MOSE JPEGImages folder
+  gt_folder: null  # PATH to MOSE Annotations folder
   file_list_txt: training/assets/MOSE_sample_train_list.txt # Optional PATH to filelist containing a subset of videos to be used for training
   multiplier: 2
 

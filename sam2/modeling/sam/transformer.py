@@ -13,6 +13,7 @@ from typing import Tuple, Type
 import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
+from torch.nn.attention import SDPBackend
 
 from sam2.modeling.position_encoding import apply_rotary_enc, compute_axial_cis
 from sam2.modeling.sam2_utils import MLP
@@ -33,11 +34,8 @@ def sdp_kernel_context(dropout_p):
     if ALLOW_ALL_KERNELS:
         return contextlib.nullcontext()
 
-    return torch.backends.cuda.sdp_kernel(
-        enable_flash=USE_FLASH_ATTN,
-        # if Flash attention kernel is off, then math kernel needs to be enabled
-        enable_math=(OLD_GPU and dropout_p > 0.0) or MATH_KERNEL_ON,
-        enable_mem_efficient=OLD_GPU,
+    return torch.nn.attention.sdpa_kernel(
+        [SDPBackend.FLASH_ATTENTION,SDPBackend.EFFICIENT_ATTENTION,SDPBackend.MATH]
     )
 
 

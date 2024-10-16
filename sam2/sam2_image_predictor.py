@@ -223,11 +223,19 @@ class SAM2ImagePredictor:
                 return_logits=return_logits,
                 img_idx=img_idx,
             )
-            masks_np = masks.squeeze(0).float().detach().cpu().numpy()
-            iou_predictions_np = (
-                iou_predictions.squeeze(0).float().detach().cpu().numpy()
-            )
-            low_res_masks_np = low_res_masks.squeeze(0).float().detach().cpu().numpy()
+
+            using_batch_points = point_coords is not None and len(point_coords.shape) == 3
+            using_batch_box = box is not None and len(box.shape) == 3
+
+            if not using_batch_points and not using_batch_box:
+                masks = masks.squeeze(0)
+                iou_predictions = iou_predictions.squeeze(0)
+                low_res_masks = low_res_masks.squeeze(0)
+
+            masks_np = masks.float().detach().cpu().numpy()
+            iou_predictions_np = iou_predictions.float().detach().cpu().numpy()
+            low_res_masks_np = low_res_masks.float().detach().cpu().numpy()
+
             all_masks.append(masks_np)
             all_ious.append(iou_predictions_np)
             all_low_res_masks.append(low_res_masks_np)
@@ -297,9 +305,17 @@ class SAM2ImagePredictor:
             return_logits=return_logits,
         )
 
-        masks_np = masks.squeeze(0).float().detach().cpu().numpy()
-        iou_predictions_np = iou_predictions.squeeze(0).float().detach().cpu().numpy()
-        low_res_masks_np = low_res_masks.squeeze(0).float().detach().cpu().numpy()
+        using_batch_points = point_coords is not None and len(point_coords.shape) == 3
+        using_batch_box = box is not None and len(box.shape) == 3
+
+        if not using_batch_points and not using_batch_box:
+            masks = masks.squeeze(0)
+            iou_predictions = iou_predictions.squeeze(0)
+            low_res_masks = low_res_masks.squeeze(0)
+
+        masks_np = masks.float().detach().cpu().numpy()
+        iou_predictions_np = iou_predictions.float().detach().cpu().numpy()
+        low_res_masks_np = low_res_masks.float().detach().cpu().numpy()
         return masks_np, iou_predictions_np, low_res_masks_np
 
     def _prep_prompts(

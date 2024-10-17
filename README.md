@@ -66,6 +66,8 @@ or individually from:
 
 (note that these are the improved checkpoints denoted as SAM 2.1; see [Model Description](#model-description) for details.)
 
+Note that checkpoints can also be loaded from 🤗 Hugging Face as explained [here](#load-from-🤗-hugging-face).
+
 Then SAM 2 can be used in a few lines as follows for image and video prediction.
 
 ### Image prediction
@@ -158,10 +160,10 @@ with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
 The table below shows the improved SAM 2.1 checkpoints released on September 29, 2024.
 |      **Model**       | **Size (M)** |    **Speed (FPS)**     | **SA-V test (J&F)** | **MOSE val (J&F)** | **LVOS v2 (J&F)** |
 | :------------------: | :----------: | :--------------------: | :-----------------: | :----------------: | :---------------: |
-|   sam2.1_hiera_tiny <br /> ([config](sam2/configs/sam2.1/sam2.1_hiera_t.yaml), [checkpoint](https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_tiny.pt))    |     38.9     |          47.2          |        76.5         |        71.8        |       77.3        |
-|   sam2.1_hiera_small <br /> ([config](sam2/configs/sam2.1/sam2.1_hiera_s.yaml), [checkpoint](https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_small.pt))   |      46      | 43.3 (53.0 compiled\*) |        76.6         |        73.5        |       78.3        |
-| sam2.1_hiera_base_plus <br /> ([config](sam2/configs/sam2.1/sam2.1_hiera_b+.yaml), [checkpoint](https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_base_plus.pt)) |     80.8     | 34.8 (43.8 compiled\*) |        78.2         |        73.7        |       78.2        |
-|   sam2.1_hiera_large <br /> ([config](sam2/configs/sam2.1/sam2.1_hiera_l.yaml), [checkpoint](https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_large.pt))   |    224.4     | 24.2 (30.2 compiled\*) |        79.5         |        74.6        |       80.6        |
+|   sam2.1_hiera_tiny <br /> ([config](sam2/configs/sam2.1/sam2.1_hiera_t.yaml), [checkpoint](https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_tiny.pt), [huggingface](https://huggingface.co/facebook/sam2.1-hiera-tiny))    |     38.9     |          47.2          |        76.5         |        71.8        |       77.3        |
+|   sam2.1_hiera_small <br /> ([config](sam2/configs/sam2.1/sam2.1_hiera_s.yaml), [checkpoint](https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_small.pt), [huggingface](https://huggingface.co/facebook/sam2.1-hiera-small))   |      46      | 43.3 (53.0 compiled\*) |        76.6         |        73.5        |       78.3        |
+| sam2.1_hiera_base_plus <br /> ([config](sam2/configs/sam2.1/sam2.1_hiera_b+.yaml), [checkpoint](https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_base_plus.pt), [huggingface](https://huggingface.co/facebook/sam2.1-hiera-base-plus)) |     80.8     | 34.8 (43.8 compiled\*) |        78.2         |        73.7        |       78.2        |
+|   sam2.1_hiera_large <br /> ([config](sam2/configs/sam2.1/sam2.1_hiera_l.yaml), [checkpoint](https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_large.pt), [huggingface](https://huggingface.co/facebook/sam2.1-hiera-large))   |    224.4     | 24.2 (30.2 compiled\*) |        79.5         |        74.6        |       80.6        |
 
 ### SAM 2 checkpoints
 
@@ -169,10 +171,10 @@ The previous SAM 2 checkpoints released on July 29, 2024 can be found as follows
 
 |      **Model**       | **Size (M)** |    **Speed (FPS)**     | **SA-V test (J&F)** | **MOSE val (J&F)** | **LVOS v2 (J&F)** |
 | :------------------: | :----------: | :--------------------: | :-----------------: | :----------------: | :---------------: |
-|   sam2_hiera_tiny <br /> ([config](sam2/configs/sam2/sam2_hiera_t.yaml), [checkpoint](https://dl.fbaipublicfiles.com/segment_anything_2/072824/sam2_hiera_tiny.pt))   |     38.9     |          47.2          |        75.0         |        70.9        |       75.3        |
-|   sam2_hiera_small <br /> ([config](sam2/configs/sam2/sam2_hiera_s.yaml), [checkpoint](https://dl.fbaipublicfiles.com/segment_anything_2/072824/sam2_hiera_small.pt))   |      46      | 43.3 (53.0 compiled\*) |        74.9         |        71.5        |       76.4        |
-| sam2_hiera_base_plus <br /> ([config](sam2/configs/sam2/sam2_hiera_b+.yaml), [checkpoint](https://dl.fbaipublicfiles.com/segment_anything_2/072824/sam2_hiera_base_plus.pt)) |     80.8     | 34.8 (43.8 compiled\*) |        74.7         |        72.8        |       75.8        |
-|   sam2_hiera_large <br /> ([config](sam2/configs/sam2/sam2_hiera_l.yaml), [checkpoint](https://dl.fbaipublicfiles.com/segment_anything_2/072824/sam2_hiera_large.pt))   |    224.4     | 24.2 (30.2 compiled\*) |        76.0         |        74.6        |       79.8        |
+|   sam2_hiera_tiny <br /> ([config](sam2/configs/sam2/sam2_hiera_t.yaml), [checkpoint](https://dl.fbaipublicfiles.com/segment_anything_2/072824/sam2_hiera_tiny.pt), [huggingface](https://huggingface.co/facebook/sam2-hiera-tiny))   |     38.9     |          47.2          |        75.0         |        70.9        |       75.3        |
+|   sam2_hiera_small <br /> ([config](sam2/configs/sam2/sam2_hiera_s.yaml), [checkpoint](https://dl.fbaipublicfiles.com/segment_anything_2/072824/sam2_hiera_small.pt), [huggingface](https://huggingface.co/facebook/sam2-hiera-small))   |      46      | 43.3 (53.0 compiled\*) |        74.9         |        71.5        |       76.4        |
+| sam2_hiera_base_plus <br /> ([config](sam2/configs/sam2/sam2_hiera_b+.yaml), [checkpoint](https://dl.fbaipublicfiles.com/segment_anything_2/072824/sam2_hiera_base_plus.pt), [huggingface](https://huggingface.co/facebook/sam2-hiera-base-plus)) |     80.8     | 34.8 (43.8 compiled\*) |        74.7         |        72.8        |       75.8        |
+|   sam2_hiera_large <br /> ([config](sam2/configs/sam2/sam2_hiera_l.yaml), [checkpoint](https://dl.fbaipublicfiles.com/segment_anything_2/072824/sam2_hiera_large.pt), [huggingface](https://huggingface.co/facebook/sam2-hiera-large))   |    224.4     | 24.2 (30.2 compiled\*) |        76.0         |        74.6        |       79.8        |
 
 \* Compile the model by setting `compile_image_encoder: True` in the config.
 

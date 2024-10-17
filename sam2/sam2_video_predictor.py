@@ -213,6 +213,10 @@ class SAM2VideoPredictor(SAM2Base):
                     "box prompt must be provided before any point prompt "
                     "(please use clear_old_points=True instead)"
                 )
+            if box.shape[0] > 1:
+                raise ValueError(
+                    "Only one box can be used as a prompt. Please provide a single box."
+                )
             if inference_state["tracking_has_started"]:
                 warnings.warn(
                     "You are adding a box after tracking starts. SAM 2 may not always be "

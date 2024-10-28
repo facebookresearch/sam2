@@ -1,3 +1,9 @@
+# Segment 2 for long video
+Modification of cache management to limit the number of frame in memory
+
+---------------------------------------------------------------------------------
+README from [SAM 2 original repository ](https://github.com/facebookresearch/sam2)
+---------------------------------------------------------------------------------
 # SAM 2: Segment Anything in Images and Videos
 
 **[AI at Meta, FAIR](https://ai.meta.com/research/)**

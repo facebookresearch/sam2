@@ -31,6 +31,7 @@ class SAM2VideoPredictor(SAM2Base):
         # if `add_all_frames_to_correct_as_cond` is True, we also append to the conditioning frame list any frame that receives a later correction click
         # if `add_all_frames_to_correct_as_cond` is False, we conditioning frame list to only use those initial conditioning frames
         add_all_frames_to_correct_as_cond=False,
+        # Number of frame to keep in cache to limit memory consumption
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -39,6 +40,7 @@ class SAM2VideoPredictor(SAM2Base):
         self.clear_non_cond_mem_around_input = clear_non_cond_mem_around_input
         self.clear_non_cond_mem_for_multi_obj = clear_non_cond_mem_for_multi_obj
         self.add_all_frames_to_correct_as_cond = add_all_frames_to_correct_as_cond
+
 
     @torch.inference_mode()
     def init_state(
@@ -666,6 +668,7 @@ class SAM2VideoPredictor(SAM2Base):
         start_frame_idx=None,
         max_frame_num_to_track=None,
         reverse=False,
+        nbr_frame_to_keep_in_memory=-1,
     ):
         """Propagate the input points across frames to track in the entire video."""
         self.propagate_in_video_preflight(inference_state)
@@ -729,7 +732,20 @@ class SAM2VideoPredictor(SAM2Base):
                     reverse=reverse,
                     run_mem_encoder=True,
                 )
-                output_dict[storage_key][frame_idx] = current_out
+            output_dict[storage_key][frame_idx] = current_out
+
+            # (Hacky) Delete old state data to clear space after '_run_single_frame_inference'
+            if nbr_frame_to_keep_in_memory > 0:
+                storage_key, obj_key = "non_cond_frame_outputs", "output_dict_per_obj"
+                oldest_allowed_idx = frame_idx - nbr_frame_to_keep_in_memory
+                all_frame_idxs = output_dict[storage_key].keys()
+                old_frame_idxs = [idx for idx in all_frame_idxs if idx < oldest_allowed_idx]
+                for old_idx in old_frame_idxs:
+                    output_dict[storage_key].pop(old_idx)
+                    for objid in inference_state[obj_key].keys():
+                        inference_state[obj_key][objid][storage_key].pop(old_idx)    
+            
+
             # Create slices of per-object outputs for subsequent interaction with each
             # individual object after tracking.
             self._add_output_per_object(

@@ -141,8 +141,9 @@ class AsyncVideoFrameLoader:
             except Exception as e:
                 self.exception = e
 
-        self.thread = Thread(target=_load_frames, daemon=True)
-        self.thread.start()
+        # Undo the multithreading for loading frame from SAM2 sor it wait for the model 
+        # self.thread = Thread(target=_load_frames, daemon=True)
+        # self.thread.start()
 
     def __getitem__(self, index):
         if self.exception is not None:

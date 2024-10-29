@@ -1,7 +1,0 @@
-pycocoevalcap
-scikit-image
-opencv-python
-tqdm
-pillow
-numpy
-matplotlib

@@ -1,76 +1,68 @@
-# Use an NVIDIA CUDA image as the base
-# Thanks to https://github.com/peasant98/SAM2-Docker for the source
+ARG BASE_IMAGE=pytorch/pytorch:2.3.1-cuda12.1-cudnn8-runtime
+ARG MODEL_SIZE=tiny
 
-FROM nvidia/cuda:12.4.1-devel-ubuntu20.04
+FROM ${BASE_IMAGE}
 
-# Set up environment variables
-ENV DEBIAN_FRONTEND=noninteractive
-ENV PATH="${PATH}:/home/user/.local/bin"
+# Gunicorn environment variables
+# ENV GUNICORN_WORKERS=1
+# ENV GUNICORN_THREADS=2
+# ENV GUNICORN_PORT=5000
 
-# We love UTF!
-ENV LANG=C.UTF-8
+# SAM 2 environment variables
+ENV APP_ROOT=/opt/sam2_lv
+ENV PYTHONPATH=":${APP_ROOT}"
 
-RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
+ENV PYTHONUNBUFFERED=1
+ENV SAM2_BUILD_CUDA=0
+# ENV MODEL_SIZE=${MODEL_SIZE}
+ENV MODEL_SIZE=tiny
 
-# Set the nvidia container runtime environment variables
-ENV NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-all}
-ENV NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES:+$NVIDIA_DRIVER_CAPABILITIES,}graphics
-ENV PATH=/usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
-ENV CUDA_HOME="/usr/local/cuda"
-ENV TORCH_CUDA_ARCH_LIST="6.0 6.1 7.0 7.5 8.0 8.6+PTX 8.9"
+# Install system requirements
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    libavutil-dev \
+    libavcodec-dev \
+    libavformat-dev \
+    libswscale-dev \
+    pkg-config \
+    build-essential \
+    libffi-dev
 
-# Install some handy tools. Even Guvcview for webcam support!
-RUN set -x \
-	&& apt-get update --fix-missing \
-	&& apt-get install -y apt-transport-https ca-certificates \
-	&& apt-get install -y git vim tmux nano htop sudo curl wget gnupg2 \
-	&& apt-get install -y bash-completion \
-	&& apt-get install -y guvcview \
-	&& rm -rf /var/lib/apt/lists/* \
-	&& useradd -ms /bin/bash user \
-	&& echo "user:user" | chpasswd && adduser user sudo \
-	&& echo "user ALL=(ALL) NOPASSWD: ALL " >> /etc/sudoers
+COPY setup.py .
+COPY README.md .
 
-RUN set -x \
-    && apt-get update && apt-get install ffmpeg libsm6 libxext6  -y
+RUN pip install --upgrade pip setuptools
+RUN pip install -e ".[dev]"
 
-RUN set -x \
-    && apt-get update \
-    && apt-get install -y software-properties-common \
-    && add-apt-repository ppa:deadsnakes/ppa \
-    && apt-get update \
-    && apt-get install -y python3.11 python3.11-venv python3.11-dev \
-    && apt-get install -y python3.11-tk
+# https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite/issues/69#issuecomment-1826764707
+RUN rm /opt/conda/bin/ffmpeg && ln -s /bin/ffmpeg /opt/conda/bin/ffmpeg
 
-RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 1 \
-    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 2
+# Make app directory. This directory will host all files required for the
+# backend and SAM 2 inference files.
+RUN mkdir ${APP_ROOT}
 
-RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11
+# Copy backend server files
+# COPY demo/backend/server ${APP_ROOT}/server
 
-WORKDIR /home/user
+# Copy SAM 2 inference files
+COPY sam2 ${APP_ROOT}/sam2
+COPY test ${APP_ROOT}/test
 
-COPY ./segment-anything-2 ./segment-anything-2
-RUN cd segment-anything-2 && \
-    python3 -m pip install -e . -v && \
-    python3 -m pip install -e ".[demo]"
-RUN cd segment-anything-2/checkpoints && ls -la && /bin/bash ./download_ckpts.sh
+# Download SAM 2.1 checkpoints
+ADD https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_tiny.pt ${APP_ROOT}/checkpoints/sam2.1_hiera_tiny.pt
+ADD https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_small.pt ${APP_ROOT}/checkpoints/sam2.1_hiera_small.pt
+ADD https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_base_plus.pt ${APP_ROOT}/checkpoints/sam2.1_hiera_base_plus.pt
+ADD https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_large.pt ${APP_ROOT}/checkpoints/sam2.1_hiera_large.pt
 
-RUN python3 -m pip install supervision
+WORKDIR ${APP_ROOT}/
 
-RUN usermod -aG dialout user
-USER user
-STOPSIGNAL SIGTERM
-
-# COPY ./script /home/user/script
-
-CMD ["sudo", "service", "ssh", "start", "&&", "/bin/bash"]
-
-# docker build -t tchataing/sam2 -f ./Dockerfile_sam .
-# docker run -it -v /tmp/.X11-unix:/tmp/.X11-unix  -e DISPLAY=$DISPLAY -p 8888:8888 --gpus all tchataing/sam2 bash
-# docker run -it --rm -v /tmp/.X11-unix:/tmp/.X11-unix  -e DISPLAY=$DISPLAY -p 8888:8888 --gpus all tchataing/sam2 bash
-# docker run -it --rm -v /tmp/.X11-unix:/tmp/.X11-unix -v $PWD/input/8100_dir:/home/user/input -v $PWD/output:/home/user/output -e DISPLAY=$DISPLAY -p 8888:8888 --gpus all tchataing/sam2 bash
-
-# sudo jupyter-lab --no-browser --ip 0.0.0.0 --allow-root
-
-
-# for singularity singularity pull docker://tchataing/alphapose
+# https://pythonspeed.com/articles/gunicorn-in-docker/
+# CMD gunicorn --worker-tmp-dir /dev/shm \
+#     --worker-class gthread app:app \
+#     --log-level info \
+#     --access-logfile /dev/stdout \
+#     --log-file /dev/stderr \
+#     --workers ${GUNICORN_WORKERS} \
+#     --threads ${GUNICORN_THREADS} \
+#     --bind 0.0.0.0:${GUNICORN_PORT} \
+#     --timeout 60

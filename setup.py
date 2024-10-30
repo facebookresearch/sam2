@@ -50,6 +50,10 @@ EXTRA_PACKAGES = {
         "tensordict>=0.5.0",
         "opencv-python>=4.7.0",
         "submitit>=1.5.1",
+        "jupyter>=1.0.0",
+        "jupyterlab>=4.2.0",
+        "matplotlib>=3.9.1",
+        "eva-decord>=0.6.1",
     ],
 }
 

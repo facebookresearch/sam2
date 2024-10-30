@@ -1,6 +1,33 @@
 # Segment 2 for long video
 Modification of cache management to limit the number of frame in memory
 
+## Use :
+Add the ´nbr_frame_to_keep_in_memory´ to the function predictor.propagate_in_video()
+
+
+```python
+import torch
+from sam2.build_sam import build_sam2_video_predictor
+
+checkpoint = "./checkpoints/sam2.1_hiera_large.pt"
+model_cfg = "configs/sam2.1/sam2.1_hiera_l.yaml"
+predictor = build_sam2_video_predictor(model_cfg, checkpoint)
+
+with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
+    state = predictor.init_state(<your_video>)
+
+    # add new prompts and instantly get the output on the same frame
+    frame_idx, object_ids, masks = predictor.add_new_points_or_box(state, <your_prompts>):
+
+    # propagate the prompts to get masklets throughout the video
+    for frame_idx, object_ids, masks in predictor.propagate_in_video(state, nbr_frame_to_keep_in_memory):
+        ...
+```
+## Sources :
+
+[https://github.com/facebookresearch/segment-anything-2/issues/264](https://github.com/facebookresearch/segment-anything-2/issues/264)
+
+[https://github.com/facebookresearch/segment-anything-2/issues/196](https://github.com/facebookresearch/segment-anything-2/issues/196)
 ---------------------------------------------------------------------------------
 README from [SAM 2 original repository ](https://github.com/facebookresearch/sam2)
 ---------------------------------------------------------------------------------

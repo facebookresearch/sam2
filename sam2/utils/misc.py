@@ -142,6 +142,7 @@ class AsyncVideoFrameLoader:
                 self.exception = e
 
         # Undo the multithreading for loading frame from SAM2 sor it wait for the model 
+        # TODO should we allow multithreading but limit how much advance SAM2 can take over the propagate ?
         # self.thread = Thread(target=_load_frames, daemon=True)
         # self.thread.start()
 

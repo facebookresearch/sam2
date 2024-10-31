@@ -32,6 +32,7 @@ export function encode(
     let encodedFrameIndex = 0;
     let nextKeyFrameTimestamp = 0;
     let trackID: number | null = null;
+    let totalDuration = 0;
     const durations: number[] = [];
 
     const outputFile = createFile();
@@ -52,9 +53,14 @@ export function encode(
         }
         const shiftedDuration = durations.shift();
         if (shiftedDuration != null) {
+          const scaledDuration = getScaledDuration(shiftedDuration);
+          totalDuration += scaledDuration;
+
           outputFile.addSample(trackID, uint8, {
-            duration: getScaledDuration(shiftedDuration),
-            is_sync: chunk.type === 'key',
+              duration: scaledDuration,
+              is_sync: chunk.type === 'key',
+              dts: totalDuration,  // Add explicit DTS
+              cts: totalDuration,  // Add explicit CTS
           });
           encodedFrameIndex++;
           progressCallback?.(encodedFrameIndex / numFrames);

@@ -18,7 +18,7 @@
 
 - A new suite of improved model checkpoints (denoted as **SAM 2.1**) are released. See [Model Description](#model-description) for details.
   * To use the new SAM 2.1 checkpoints, you need the latest model code from this repo. If you have installed an earlier version of this repo, please first uninstall the previous version via `pip uninstall SAM-2`, pull the latest code from this repo (with `git pull`), and then reinstall the repo following [Installation](#installation) below.
-- The training (and fine-tuning) code has been released. See [`training/README.md`](training/README.md) on how to get started.
+- The training (and fine-tuning) code has been released [with an example notebook](https://github.com/capjamesg/sam2/blob/main/notebooks/Fine-Tune%20SAM-2.1.ipynb). See [`training/README.md`](training/README.md) on how to get started.
 - The frontend + backend code for the SAM 2 web demo has been released. See [`demo/README.md`](demo/README.md) for details.
 
 ## Installation

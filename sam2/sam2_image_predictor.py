@@ -457,7 +457,7 @@ class SAM2ImagePredictor:
         return self.model.device
 
     def import_fields(self, fields):
-        self._features = fields["features"]
+        self._features = fields["_features"]
         self._orig_hw = fields["_orig_hw"]
         self._is_image_set = True
         

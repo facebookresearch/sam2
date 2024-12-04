@@ -105,7 +105,7 @@ cd demo/backend/server/
 ```bash
 PYTORCH_ENABLE_MPS_FALLBACK=1 \
 APP_ROOT="$(pwd)/../../../" \
-APP_URL=http://localhost:7263 \
+API_URL=http://localhost:7263 \
 MODEL_SIZE=base_plus \
 DATA_PATH="$(pwd)/../../data" \
 DEFAULT_VIDEO_PATH=gallery/05_default_juggle.mp4 \

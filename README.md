@@ -112,3 +112,13 @@ The memory attention in tflite does not support dynamic shapes, so num_maskmem a
 ## Original document
 
 - [README_ORIGINAL.md](README_ORIGINAL.md)
+
+## Tags
+
+### 4dim matmul
+
+main
+
+### 6dim matmul
+
+https://github.com/axinc-ai/segment-anything-2/tree/f36169e87ec302c75279fadc60cda1c3763165eb

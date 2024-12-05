@@ -46,7 +46,7 @@ def dice_loss(inputs, targets, num_objects, loss_on_multimask=False):
         inputs = inputs.flatten(1)
     denominator = inputs.sum(-1) + targets.sum(-1)
     difference = LA.vector_norm(inputs - targets, ord=1, dim=-1)
-    numerator = (denominator - difference) / 2
+    numerator = denominator - difference
     loss = 1 - (numerator + 1) / (denominator + 1)
     if loss_on_multimask:
         return loss / num_objects

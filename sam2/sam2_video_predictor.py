@@ -1188,35 +1188,28 @@ class SAM2VideoPredictorVOS(SAM2VideoPredictor):
             self.memory_encoder.forward,
             mode="max-autotune",
             fullgraph=True,
-            dynamic=True,
+            dynamic=False,
         )
 
         self.memory_attention.forward = torch.compile(
             self.memory_attention.forward,
             mode="max-autotune",
             fullgraph=True,
-            dynamic=True,
-        )
-
-        self.sam_prompt_encoder.get_dense_pe = torch.compile(
-            self.sam_prompt_encoder.get_dense_pe,
-            mode="max-autotune",
-            fullgraph=True,
-            dynamic=True,
+            dynamic=True,  # Num. of memories varies
         )
 
         self.sam_prompt_encoder.forward = torch.compile(
             self.sam_prompt_encoder.forward,
             mode="max-autotune",
             fullgraph=True,
-            dynamic=True,
+            dynamic=False,  # Accuracy regression on True
         )
 
         self.sam_mask_decoder.forward = torch.compile(
             self.sam_mask_decoder.forward,
             mode="max-autotune",
             fullgraph=True,
-            dynamic=True,
+            dynamic=False,  # Accuracy regression on True
         )
 
     def forward_image(self, img_batch: torch.Tensor):

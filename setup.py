@@ -22,8 +22,8 @@ with open("README.md", "r", encoding="utf-8") as f:
 
 # Required dependencies
 REQUIRED_PACKAGES = [
-    "torch>=2.3.1",
-    "torchvision>=0.18.1",
+    "torch>=2.5.1",
+    "torchvision>=0.20.1",
     "numpy>=1.24.4",
     "tqdm>=4.66.1",
     "hydra-core>=1.3.2",
@@ -58,7 +58,7 @@ EXTRA_PACKAGES = {
         "scikit-image>=0.24.0",
         "tensorboard>=2.17.0",
         "pycocotools>=2.0.8",
-        "tensordict>=0.5.0",
+        "tensordict>=0.6.0",
         "opencv-python>=4.7.0",
         "submitit>=1.5.1",
     ],

@@ -92,12 +92,32 @@ class PromptEncoder(nn.Module):
         point_embedding = self.pe_layer.forward_with_coords(
             points, self.input_image_size
         )
-        point_embedding[labels == -1] = 0.0
-        point_embedding[labels == -1] += self.not_a_point_embed.weight
-        point_embedding[labels == 0] += self.point_embeddings[0].weight
-        point_embedding[labels == 1] += self.point_embeddings[1].weight
-        point_embedding[labels == 2] += self.point_embeddings[2].weight
-        point_embedding[labels == 3] += self.point_embeddings[3].weight
+
+        point_embedding = torch.where(
+            (labels == -1).unsqueeze(-1),
+            torch.zeros_like(point_embedding) + self.not_a_point_embed.weight,
+            point_embedding,
+        )
+        point_embedding = torch.where(
+            (labels == 0).unsqueeze(-1),
+            point_embedding + self.point_embeddings[0].weight,
+            point_embedding,
+        )
+        point_embedding = torch.where(
+            (labels == 1).unsqueeze(-1),
+            point_embedding + self.point_embeddings[1].weight,
+            point_embedding,
+        )
+        point_embedding = torch.where(
+            (labels == 2).unsqueeze(-1),
+            point_embedding + self.point_embeddings[2].weight,
+            point_embedding,
+        )
+        point_embedding = torch.where(
+            (labels == 3).unsqueeze(-1),
+            point_embedding + self.point_embeddings[3].weight,
+            point_embedding,
+        )
         return point_embedding
 
     def _embed_boxes(self, boxes: torch.Tensor) -> torch.Tensor:

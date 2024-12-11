@@ -980,9 +980,7 @@ class SAM2VideoPredictorVOS(SAM2VideoPredictor):
         self._compile_all_components()
 
     def _compile_all_components(self):
-        print(
-            "Compiling all components for for vos setting. First time may be very slow."
-        )
+        print("Compiling all components for VOS setting. First time may be very slow.")
         self.memory_encoder.forward = torch.compile(
             self.memory_encoder.forward,
             mode="max-autotune",

@@ -58,7 +58,7 @@ EXTRA_PACKAGES = {
         "scikit-image>=0.24.0",
         "tensorboard>=2.17.0",
         "pycocotools>=2.0.8",
-        "tensordict>=0.5.0",
+        "tensordict>=0.6.0",
         "opencv-python>=4.7.0",
         "submitit>=1.5.1",
     ],

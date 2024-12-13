@@ -210,7 +210,7 @@ __global__ void final_counting(
 
 } // namespace cc2d
 
-std::vector<torch::Tensor> get_connected_componnets(
+std::vector<torch::Tensor> get_connected_components(
     const torch::Tensor& inputs) {
   AT_ASSERTM(inputs.is_cuda(), "inputs must be a CUDA tensor");
   AT_ASSERTM(inputs.ndimension() == 4, "inputs must be [N, 1, H, W] shape");
@@ -283,7 +283,7 @@ std::vector<torch::Tensor> get_connected_componnets(
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def(
-      "get_connected_componnets",
-      &get_connected_componnets,
-      "get_connected_componnets");
+      "get_connected_components",
+      &get_connected_components,
+      "get_connected_components");
 }

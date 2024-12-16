@@ -110,7 +110,7 @@ class PalettisedPNGSegmentLoader:
         # build a mapping from frame id to their PNG mask path
         # note that in some datasets, the PNG paths could have more
         # than 5 digits, e.g. "00000000.png" instead of "00000.png"
-        png_filenames = os.listdir(self.video_png_root)
+        png_filenames = [filename for filename in os.listdir(self.video_png_root) if os.path.splitext(filename)[0].isdigit()]
         self.frame_id_to_png_filename = {}
         for filename in png_filenames:
             frame_id, _ = os.path.splitext(filename)

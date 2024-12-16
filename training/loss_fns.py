@@ -9,6 +9,7 @@ from typing import Dict, List
 
 import torch
 import torch.distributed
+import torch.linalg as LA
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -20,6 +21,9 @@ from training.utils.distributed import get_world_size, is_dist_avail_and_initial
 def dice_loss(inputs, targets, num_objects, loss_on_multimask=False):
     """
     Compute the DICE loss, similar to generalized IOU for masks
+    Reference:
+        Dice Semimetric Losses: Optimizing the Dice Score with Soft Labels.
+                Wang, Z. et. al. MICCAI 2023.
     Args:
         inputs: A float tensor of arbitrary shape.
                 The predictions for each example.
@@ -38,11 +42,11 @@ def dice_loss(inputs, targets, num_objects, loss_on_multimask=False):
         # flatten spatial dimension while keeping multimask channel dimension
         inputs = inputs.flatten(2)
         targets = targets.flatten(2)
-        numerator = 2 * (inputs * targets).sum(-1)
     else:
         inputs = inputs.flatten(1)
-        numerator = 2 * (inputs * targets).sum(1)
     denominator = inputs.sum(-1) + targets.sum(-1)
+    difference = LA.vector_norm(inputs - targets, ord=1, dim=-1)
+    numerator = denominator - difference
     loss = 1 - (numerator + 1) / (denominator + 1)
     if loss_on_multimask:
         return loss / num_objects

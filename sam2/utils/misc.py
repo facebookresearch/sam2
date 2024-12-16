@@ -6,6 +6,7 @@
 
 import os
 import warnings
+from pathlib import Path
 from threading import Thread
 
 import numpy as np
@@ -182,6 +183,8 @@ def load_video_frames(
     Load the video frames from video_path. The frames are resized to image_size as in
     the model and are loaded to GPU if offload_video_to_cpu=False. This is used by the demo.
     """
+    if isinstance(video_path, Path):
+        video_path = str(video_path)
     is_bytes = isinstance(video_path, bytes)
     is_str = isinstance(video_path, str)
     is_mp4_path = is_str and os.path.splitext(video_path)[-1] in [".mp4", ".MP4"]

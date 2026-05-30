@@ -68,7 +68,7 @@
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.3",
     "invariant": "^2.2.4",
-    "postcss": "^8.4.28",
+    "postcss": "^8.5.10",
     "postinstall-postinstall": "^2.1.0",
     "prettier": "^3.0.3",
     "relay-compiler": "^16.2.0",

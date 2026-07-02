@@ -441,7 +441,7 @@ def layer_decay_param_modifier(
             Alternatively, use apply_to argument to select a specific component of the model.
     - layer_decay_value: float
     - layer_decay_min: min val for layer decay
-    - apply_to: optional arg to select which component of the model to apply the the layer decay modifier to
+    - apply_to: optional arg to select which component of the model to apply the layer decay modifier to
     - overrides: to manually override lr for specific patterns. Is a list of dicts. Each dict, has keys "pattern", "value".
     Returns
     - scheduler_configs: same structure as the input, elements can be modified

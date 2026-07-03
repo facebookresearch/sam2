@@ -172,6 +172,7 @@ class SAM2ImagePredictor:
         self._is_batch = True
         logging.info("Image embeddings computed.")
 
+    @torch.no_grad()
     def predict_batch(
         self,
         point_coords_batch: List[np.ndarray] = None,
@@ -234,6 +235,7 @@ class SAM2ImagePredictor:
 
         return all_masks, all_ious, all_low_res_masks
 
+    @torch.no_grad()
     def predict(
         self,
         point_coords: Optional[np.ndarray] = None,
@@ -437,6 +439,7 @@ class SAM2ImagePredictor:
 
         return masks, iou_predictions, low_res_masks
 
+    @torch.no_grad()
     def get_image_embedding(self) -> torch.Tensor:
         """
         Returns the image embeddings for the currently set image, with

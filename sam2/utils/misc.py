@@ -206,7 +206,9 @@ def load_video_frames(
         )
     else:
         raise NotImplementedError(
-            "Only MP4 video and JPEG folder are supported at this moment"
+            "Only video files and JPEG folders are supported at this moment. "
+            "Supported video formats include MP4, MOV, AVI, and any other "
+            "container format supported by PyAV."
         )
 
 

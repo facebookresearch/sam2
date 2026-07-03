@@ -92,9 +92,9 @@ class SAM2ImagePredictor:
         masks to be predicted with the 'predict' method.
 
         Arguments:
-          image (np.ndarray or PIL Image): The input image to embed in RGB format. The image should be in HWC format if np.ndarray, or WHC format if PIL Image
-          with pixel values in [0, 255].
-          image_format (str): The color format of the image, in ['RGB', 'BGR'].
+          image (np.ndarray or PIL Image): The input image to embed in RGB format.
+            If np.ndarray, expected shape is HxWxC with pixel values in [0, 255].
+            If PIL Image, the image is expected in (W, H) format with pixel values in [0, 255].
         """
         self.reset_predictor()
         # Transform the image to the form expected by the model

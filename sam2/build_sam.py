@@ -5,11 +5,32 @@
 # LICENSE file in the root directory of this source tree.
 
 import logging
+import os
 
 import torch
 from hydra import compose
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
+
+import sam2
+
+# Check if the user is running Python from the parent directory of the sam2 repo
+# (i.e. the directory where this repo is cloned into) -- this is not supported since
+# it could shadow the sam2 package and cause issues.
+if os.path.isdir(os.path.join(sam2.__path__[0], "sam2")):
+    # If the user has "sam2/sam2" in their path, they are likey importing the repo itself
+    # as "sam2" rather than importing the "sam2" python package (i.e. "sam2/sam2" directory).
+    # This typically happens because the user is running Python from the parent directory
+    # that contains the sam2 repo they cloned.
+    raise RuntimeError(
+        "You're likely running Python from the parent directory of the sam2 repository "
+        "(i.e. the directory where https://github.com/facebookresearch/sam2 is cloned into). "
+        "This is not supported since the `sam2` Python package could be shadowed by the "
+        "repository name (the repository is also named `sam2` and contains the Python package "
+        "in `sam2/sam2`). Please run Python from another directory (e.g. from the repo dir "
+        "rather than its parent dir, or from your home directory) after installing SAM 2."
+    )
+
 
 HF_MODEL_ID_TO_FILENAMES = {
     "facebook/sam2-hiera-tiny": (
@@ -83,11 +104,18 @@ def build_sam2_video_predictor(
     mode="eval",
     hydra_overrides_extra=[],
     apply_postprocessing=True,
+    vos_optimized=False,
     **kwargs,
 ):
     hydra_overrides = [
         "++model._target_=sam2.sam2_video_predictor.SAM2VideoPredictor",
     ]
+    if vos_optimized:
+        hydra_overrides = [
+            "++model._target_=sam2.sam2_video_predictor.SAM2VideoPredictorVOS",
+            "++model.compile_image_encoder=True",  # Let sam2_base handle this
+        ]
+
     if apply_postprocessing:
         hydra_overrides_extra = hydra_overrides_extra.copy()
         hydra_overrides_extra += [
@@ -135,7 +163,7 @@ def build_sam2_video_predictor_hf(model_id, **kwargs):
 
 def _load_checkpoint(model, ckpt_path):
     if ckpt_path is not None:
-        sd = torch.load(ckpt_path, map_location="cpu")["model"]
+        sd = torch.load(ckpt_path, map_location="cpu", weights_only=True)["model"]
         missing_keys, unexpected_keys = model.load_state_dict(sd)
         if missing_keys:
             logging.error(missing_keys)

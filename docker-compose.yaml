@@ -33,3 +33,10 @@ services:
       - VIDEO_ENCODE_MAX_WIDTH=1280
       - VIDEO_ENCODE_MAX_HEIGHT=720
       - VIDEO_ENCODE_VERBOSE=False
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

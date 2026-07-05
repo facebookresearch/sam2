@@ -375,7 +375,7 @@ def main():
     parser.add_argument(
         "--sam2_checkpoint",
         type=str,
-        default="./checkpoints/sam2.1_hiera_b+.pt",
+        default="./checkpoints/sam2.1_hiera_base_plus.pt",
         help="path to the SAM 2 model checkpoint",
     )
     parser.add_argument(
@@ -434,6 +434,11 @@ def main():
         help="whether to track objects that appear later in the video (i.e. not on the first frame; "
         "some VOS datasets like LVOS or YouTube-VOS don't have all objects appearing in the first frame)",
     )
+    parser.add_argument(
+        "--use_vos_optimized_video_predictor",
+        action="store_true",
+        help="whether to use vos optimized video predictor with all modules compiled",
+    )
     args = parser.parse_args()
 
     # if we use per-object PNG files, they could possibly overlap in inputs and outputs
@@ -445,6 +450,7 @@ def main():
         ckpt_path=args.sam2_checkpoint,
         apply_postprocessing=args.apply_postprocessing,
         hydra_overrides_extra=hydra_overrides_extra,
+        vos_optimized=args.use_vos_optimized_video_predictor,
     )
 
     if args.use_all_masks:

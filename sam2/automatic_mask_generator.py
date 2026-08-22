@@ -287,7 +287,9 @@ class SAM2AutomaticMaskGenerator:
         # Return to the original image frame
         data["boxes"] = uncrop_boxes_xyxy(data["boxes"], crop_box)
         data["points"] = uncrop_points(data["points"], crop_box)
-        data["crop_boxes"] = torch.tensor([crop_box for _ in range(len(data["rles"]))])
+        data["crop_boxes"] = torch.tensor(
+            crop_box, dtype=torch.int64
+        ).unsqueeze(0).repeat(len(data["rles"]), 1)
 
         return data
 

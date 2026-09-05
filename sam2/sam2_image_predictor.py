@@ -194,6 +194,12 @@ class SAM2ImagePredictor:
         all_masks = []
         all_ious = []
         all_low_res_masks = []
+        # The dense positional encoding is image-independent within this call.
+        # Keep its lifetime local so model/autocast changes need no cache invalidation.
+        image_pe = None
+        if num_images > 1:
+            with torch.no_grad():
+                image_pe = self.model.sam_prompt_encoder.get_dense_pe()
         for img_idx in range(num_images):
             # Transform input prompts
             point_coords = (
@@ -222,6 +228,7 @@ class SAM2ImagePredictor:
                 multimask_output,
                 return_logits=return_logits,
                 img_idx=img_idx,
+                image_pe=image_pe,
             )
             masks_np = masks.squeeze(0).float().detach().cpu().numpy()
             iou_predictions_np = (
@@ -344,6 +351,7 @@ class SAM2ImagePredictor:
         return_logits: bool = False,
         img_idx: int = -1,
         postprocess: bool = True,
+        image_pe: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Predict masks for the given input prompts, using the currently set image.
@@ -372,6 +380,8 @@ class SAM2ImagePredictor:
             instead of a binary mask.
           postprocess (bool): If false, return raw, unclamped low-resolution
             logits as the first output for filtering before spatial expansion.
+          image_pe (torch.Tensor or None): Dense positional encoding computed
+            in the current prediction call; None computes it for this image.
 
         Returns:
           (torch.Tensor): The output masks (raw low-resolution masks when
@@ -423,7 +433,11 @@ class SAM2ImagePredictor:
         ]
         low_res_masks, iou_predictions, _, _ = self.model.sam_mask_decoder(
             image_embeddings=self._features["image_embed"][img_idx].unsqueeze(0),
-            image_pe=self.model.sam_prompt_encoder.get_dense_pe(),
+            image_pe=(
+                self.model.sam_prompt_encoder.get_dense_pe()
+                if image_pe is None
+                else image_pe
+            ),
             sparse_prompt_embeddings=sparse_embeddings,
             dense_prompt_embeddings=dense_embeddings,
             multimask_output=multimask_output,

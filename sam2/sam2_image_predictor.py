@@ -343,6 +343,7 @@ class SAM2ImagePredictor:
         multimask_output: bool = True,
         return_logits: bool = False,
         img_idx: int = -1,
+        postprocess: bool = True,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Predict masks for the given input prompts, using the currently set image.
@@ -369,9 +370,12 @@ class SAM2ImagePredictor:
             input prompts, multimask_output=False can give better results.
           return_logits (bool): If true, returns un-thresholded masks logits
             instead of a binary mask.
+          postprocess (bool): If false, return raw, unclamped low-resolution
+            logits as the first output for filtering before spatial expansion.
 
         Returns:
-          (torch.Tensor): The output masks in BxCxHxW format, where C is the
+          (torch.Tensor): The output masks (raw low-resolution masks when
+            postprocess=False) in BxCxHxW format, where C is the
             number of masks, and (H, W) is the original image size.
           (torch.Tensor): An array of shape BxC containing the model's
             predictions for the quality of each mask.
@@ -427,10 +431,14 @@ class SAM2ImagePredictor:
             high_res_features=high_res_features,
         )
 
-        # Upscale the masks to the original image resolution
-        masks = self._transforms.postprocess_masks(
-            low_res_masks, self._orig_hw[img_idx]
-        )
+        # AMG can defer postprocessing until after its predicted-IoU filter.
+        # Keep raw logits here: refinement logits below are clamped separately.
+        if postprocess:
+            masks = self._transforms.postprocess_masks(
+                low_res_masks, self._orig_hw[img_idx]
+            )
+        else:
+            masks = low_res_masks
         low_res_masks = torch.clamp(low_res_masks, -32.0, 32.0)
         if not return_logits:
             masks = masks > self.mask_threshold

@@ -311,11 +311,19 @@ class SAM2AutomaticMaskGenerator:
         in_labels = torch.ones(
             in_points.shape[0], dtype=torch.int, device=in_points.device
         )
+        # Predicted IoU is available before full-resolution mask work. Keep the
+        # native order for refinement and optional connected-component cleanup.
+        defer_postprocess = (
+            not self.use_m2m
+            and self.pred_iou_thresh > 0.0
+            and self.min_mask_region_area == 0
+        )
         masks, iou_preds, low_res_masks = self.predictor._predict(
             in_points[:, None, :],
             in_labels[:, None],
             multimask_output=self.multimask_output,
             return_logits=True,
+            postprocess=not defer_postprocess,
         )
 
         # Serialize predictions and store in MaskData
@@ -333,6 +341,11 @@ class SAM2AutomaticMaskGenerator:
             if self.pred_iou_thresh > 0.0:
                 keep_mask = data["iou_preds"] > self.pred_iou_thresh
                 data.filter(keep_mask)
+
+            if defer_postprocess:
+                data["masks"] = self.predictor._transforms.postprocess_masks(
+                    data["masks"].unsqueeze(1), im_size
+                ).squeeze(1)
 
             # Calculate and filter by stability score
             data["stability_score"] = calculate_stability_score(

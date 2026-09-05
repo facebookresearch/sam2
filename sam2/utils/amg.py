@@ -119,6 +119,25 @@ def mask_to_rle_pytorch(tensor: torch.Tensor) -> List[Dict[str, Any]]:
     diff = tensor[:, 1:] ^ tensor[:, :-1]
     change_indices = diff.nonzero()
 
+    # Sparse mask boundaries are cheap to serialize on CPU in one batch. This
+    # avoids scanning the entire change-index tensor and synchronizing once per
+    # mask. Keep dense boundaries on the original path: transferring both index
+    # columns can cost more than the per-mask run lengths in that regime.
+    # Each boundary has two int64 indices; cap the transfer table at
+    # 256 KiB per mask on average before using the original dense path.
+    if tensor.is_cuda and b > 1 and change_indices.shape[0] <= 16384 * b:
+        changes = change_indices.cpu().numpy()
+        starts = tensor[:, 0].cpu().tolist()
+        boundaries = np.searchsorted(changes[:, 0], np.arange(b + 1))
+        out = []
+        for i in range(b):
+            cur_idxs = changes[boundaries[i] : boundaries[i + 1], 1] + 1
+            counts = np.diff(np.concatenate(([0], cur_idxs, [h * w]))).tolist()
+            if starts[i]:
+                counts.insert(0, 0)
+            out.append({"size": [h, w], "counts": counts})
+        return out
+
     # Encode run length
     out = []
     for i in range(b):

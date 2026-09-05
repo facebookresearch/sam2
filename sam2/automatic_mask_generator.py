@@ -323,9 +323,10 @@ class SAM2AutomaticMaskGenerator:
             masks=masks.flatten(0, 1),
             iou_preds=iou_preds.flatten(0, 1),
             points=points.repeat_interleave(masks.shape[1], dim=0),
-            low_res_masks=low_res_masks.flatten(0, 1),
         )
-        del masks
+        if self.use_m2m:
+            data["low_res_masks"] = low_res_masks.flatten(0, 1)
+        del masks, low_res_masks
 
         if not self.use_m2m:
             # Filter by predicted IoU
@@ -351,6 +352,7 @@ class SAM2AutomaticMaskGenerator:
             masks, ious = self.refine_with_m2m(
                 in_points, labels, data["low_res_masks"], self.points_per_batch
             )
+            del data["low_res_masks"]
             data["masks"] = masks.squeeze(1)
             data["iou_preds"] = ious.squeeze(1)
 

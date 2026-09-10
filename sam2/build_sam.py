@@ -6,9 +6,12 @@
 
 import logging
 import os
+import uuid
+from pathlib import Path
 
 import torch
 from hydra import compose
+from hydra.core.config_store import ConfigStore
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
 
@@ -68,6 +71,48 @@ HF_MODEL_ID_TO_FILENAMES = {
 }
 
 
+def _config_name_for_path(config_path):
+    """Return the Hydra config name for a config file path (no extension)."""
+    name = config_path.name
+    # Hydra >= 1.2 only supports ".yaml" config files.
+    if name.endswith(".yaml"):
+        name = name[: -len(".yaml")]
+    return name
+
+
+def _compose_config(config_file, overrides):
+    """Compose the Hydra config backing `build_sam2`.
+
+    `config_file` is normally a Hydra config name resolved against the config
+    search path initialized by `sam2` (e.g. "configs/sam2.1/sam2.1_hiera_l.yaml").
+    If `config_file` is instead an existing filesystem path (e.g. an absolute
+    path to a user-provided config), its containing directory is temporarily
+    added to Hydra's config search path and the config is composed from there,
+    so the config's own defaults list and relative subconfigs keep resolving.
+    """
+    config_path = Path(config_file)
+    if not config_path.is_file():
+        return compose(config_name=config_file, overrides=overrides)
+
+    # The user passed a filesystem path rather than a config name. Register a
+    # temporary primary config that adds the config's directory to Hydra's
+    # config search path, so that the config resolves like any bundled config.
+    config_path = config_path.resolve()
+    wrapper_name = f"_sam2_external_config_{uuid.uuid4().hex}"
+    try:
+        ConfigStore.instance().store(
+            name=wrapper_name,
+            node={
+                "defaults": [_config_name_for_path(config_path), "_self_"],
+                "hydra": {"searchpath": [config_path.parent.as_uri()]},
+            },
+        )
+        return compose(config_name=wrapper_name, overrides=overrides)
+    finally:
+        # ConfigStore keeps configs in its repo under "<name>.yaml".
+        ConfigStore.instance().repo.pop(f"{wrapper_name}.yaml", None)
+
+
 def build_sam2(
     config_file,
     ckpt_path=None,
@@ -77,6 +122,12 @@ def build_sam2(
     apply_postprocessing=True,
     **kwargs,
 ):
+    """Build the SAM 2 model from a Hydra config.
+
+    `config_file` is either a Hydra config name resolved against the config
+    search path (e.g. "configs/sam2.1/sam2.1_hiera_l.yaml") or a filesystem
+    path to a config file (e.g. "/path/to/my_config.yaml").
+    """
 
     if apply_postprocessing:
         hydra_overrides_extra = hydra_overrides_extra.copy()
@@ -87,7 +138,7 @@ def build_sam2(
             "++model.sam_mask_decoder_extra_args.dynamic_multimask_stability_thresh=0.98",
         ]
     # Read config and init model
-    cfg = compose(config_name=config_file, overrides=hydra_overrides_extra)
+    cfg = _compose_config(config_file, hydra_overrides_extra)
     OmegaConf.resolve(cfg)
     model = instantiate(cfg.model, _recursive_=True)
     _load_checkpoint(model, ckpt_path)
@@ -107,6 +158,12 @@ def build_sam2_video_predictor(
     vos_optimized=False,
     **kwargs,
 ):
+    """Build the SAM 2 video predictor from a Hydra config.
+
+    `config_file` is either a Hydra config name resolved against the config
+    search path (e.g. "configs/sam2.1/sam2.1_hiera_l.yaml") or a filesystem
+    path to a config file (e.g. "/path/to/my_config.yaml").
+    """
     hydra_overrides = [
         "++model._target_=sam2.sam2_video_predictor.SAM2VideoPredictor",
     ]
@@ -131,7 +188,7 @@ def build_sam2_video_predictor(
     hydra_overrides.extend(hydra_overrides_extra)
 
     # Read config and init model
-    cfg = compose(config_name=config_file, overrides=hydra_overrides)
+    cfg = _compose_config(config_file, hydra_overrides)
     OmegaConf.resolve(cfg)
     model = instantiate(cfg.model, _recursive_=True)
     _load_checkpoint(model, ckpt_path)

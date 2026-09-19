@@ -93,6 +93,7 @@ class SAM2Base(torch.nn.Module):
         # extra arguments used to construct the SAM mask decoder; if not None, it should be a dict of kwargs to be passed into `MaskDecoder` class.
         sam_mask_decoder_extra_args=None,
         compile_image_encoder: bool = False,
+        cuda_graph_image_encoder: bool = False,
     ):
         super().__init__()
 
@@ -181,7 +182,17 @@ class SAM2Base(torch.nn.Module):
         self._build_sam_heads()
         self.max_cond_frames_in_attn = max_cond_frames_in_attn
 
-        # Model compilation
+        # Image-encoder acceleration. torch.compile and CUDA Graph capture are
+        # alternative fast paths; combining them has not been validated and can
+        # duplicate graph management in the compiler backend.
+        if compile_image_encoder and cuda_graph_image_encoder:
+            raise ValueError(
+                "compile_image_encoder and cuda_graph_image_encoder cannot both "
+                "be enabled"
+            )
+        self.cuda_graph_image_encoder = cuda_graph_image_encoder
+        self._cuda_graph_image_encoder_state = None
+
         if compile_image_encoder:
             # Compile the forward function (not the full module) to allow loading checkpoints.
             print(
@@ -464,8 +475,8 @@ class SAM2Base(torch.nn.Module):
             object_score_logits,
         )
 
-    def forward_image(self, img_batch: torch.Tensor):
-        """Get the image feature on the input batch."""
+    def _forward_image_eager(self, img_batch: torch.Tensor):
+        """Run the image encoder without CUDA Graph replay."""
         backbone_out = self.image_encoder(img_batch)
         if self.use_high_res_features_in_sam:
             # precompute projected level 0 and level 1 features in SAM decoder
@@ -477,6 +488,89 @@ class SAM2Base(torch.nn.Module):
                 backbone_out["backbone_fpn"][1]
             )
         return backbone_out
+
+    @staticmethod
+    def _clone_cuda_graph_output(value):
+        """Detach callers from buffers that are overwritten on graph replay."""
+        if isinstance(value, torch.Tensor):
+            return value.clone()
+        if isinstance(value, dict):
+            return {
+                key: SAM2Base._clone_cuda_graph_output(item)
+                for key, item in value.items()
+            }
+        if isinstance(value, list):
+            return [SAM2Base._clone_cuda_graph_output(item) for item in value]
+        if isinstance(value, tuple):
+            return tuple(SAM2Base._clone_cuda_graph_output(item) for item in value)
+        return value
+
+    @staticmethod
+    def _cuda_graph_input_signature(img_batch: torch.Tensor):
+        autocast_enabled = torch.is_autocast_enabled(img_batch.device.type)
+        autocast_dtype = (
+            torch.get_autocast_dtype(img_batch.device.type)
+            if autocast_enabled
+            else None
+        )
+        return (
+            tuple(img_batch.shape),
+            img_batch.dtype,
+            img_batch.device,
+            autocast_enabled,
+            autocast_dtype,
+        )
+
+    def _capture_image_encoder_cuda_graph(self, img_batch: torch.Tensor):
+        """Capture the fixed-signature image encoder into a CUDA Graph."""
+        static_input = torch.empty_like(img_batch)
+        static_input.copy_(img_batch)
+
+        current_stream = torch.cuda.current_stream(img_batch.device)
+        warmup_stream = torch.cuda.Stream(device=img_batch.device)
+        warmup_stream.wait_stream(current_stream)
+        with torch.cuda.stream(warmup_stream):
+            for _ in range(3):
+                warmup_output = self._forward_image_eager(static_input)
+        current_stream.wait_stream(warmup_stream)
+        del warmup_output
+
+        graph = torch.cuda.CUDAGraph()
+        with torch.cuda.graph(graph):
+            static_output = self._forward_image_eager(static_input)
+
+        self._cuda_graph_image_encoder_state = {
+            "signature": self._cuda_graph_input_signature(img_batch),
+            "input": static_input,
+            "output": static_output,
+            "graph": graph,
+        }
+
+    def _forward_image_cuda_graph(self, img_batch: torch.Tensor):
+        """Replay a captured image encoder while preserving output ownership."""
+        # CUDA Graphs are an inference optimization. Preserve eager semantics for
+        # training, gradients, and non-CUDA inputs.
+        if self.training or torch.is_grad_enabled() or not img_batch.is_cuda:
+            return self._forward_image_eager(img_batch)
+
+        signature = self._cuda_graph_input_signature(img_batch)
+        state = self._cuda_graph_image_encoder_state
+        if state is None or state["signature"] != signature:
+            self._capture_image_encoder_cuda_graph(img_batch)
+            state = self._cuda_graph_image_encoder_state
+
+        state["input"].copy_(img_batch)
+        state["graph"].replay()
+        # Graph outputs own fixed addresses and are overwritten by the next
+        # replay. The video predictor caches image features, so return
+        # frame-owned tensors rather than exposing those static buffers.
+        return self._clone_cuda_graph_output(state["output"])
+
+    def forward_image(self, img_batch: torch.Tensor):
+        """Get the image feature on the input batch."""
+        if self.cuda_graph_image_encoder:
+            return self._forward_image_cuda_graph(img_batch)
+        return self._forward_image_eager(img_batch)
 
     def _prepare_backbone_features(self, backbone_out):
         """Prepare and flatten visual features."""

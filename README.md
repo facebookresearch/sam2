@@ -121,6 +121,14 @@ with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
 
 Please refer to the examples in [video_predictor_example.ipynb](./notebooks/video_predictor_example.ipynb) (also in Colab [here](https://colab.research.google.com/github/facebookresearch/sam2/blob/main/notebooks/video_predictor_example.ipynb)) for details on how to add click or box prompts, make refinements, and track multiple objects in videos.
 
+For fixed-resolution CUDA video inference, `build_sam2_video_predictor` also
+supports `cuda_graph_image_encoder=True`. This opt-in path lazily captures the
+image encoder on its first input signature and replays it on subsequent frames
+to reduce CPU launch overhead. It preserves frame-owned feature tensors for the
+video predictor's cache and automatically re-captures if the input shape, dtype,
+device, or CUDA autocast mode changes. This option is an alternative to
+`vos_optimized=True` and the two should not be enabled together.
+
 ## Load from 🤗 Hugging Face
 
 Alternatively, models can also be loaded from [Hugging Face](https://huggingface.co/models?search=facebook/sam2) (requires `pip install huggingface_hub`).

@@ -105,6 +105,7 @@ def build_sam2_video_predictor(
     hydra_overrides_extra=[],
     apply_postprocessing=True,
     vos_optimized=False,
+    cuda_graph_image_encoder=False,
     **kwargs,
 ):
     hydra_overrides = [
@@ -115,6 +116,12 @@ def build_sam2_video_predictor(
             "++model._target_=sam2.sam2_video_predictor.SAM2VideoPredictorVOS",
             "++model.compile_image_encoder=True",  # Let sam2_base handle this
         ]
+    if vos_optimized and cuda_graph_image_encoder:
+        raise ValueError(
+            "vos_optimized and cuda_graph_image_encoder cannot both be enabled"
+        )
+    if cuda_graph_image_encoder:
+        hydra_overrides.append("++model.cuda_graph_image_encoder=True")
 
     if apply_postprocessing:
         hydra_overrides_extra = hydra_overrides_extra.copy()

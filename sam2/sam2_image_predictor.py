@@ -184,6 +184,8 @@ class SAM2ImagePredictor:
     ) -> Tuple[List[np.ndarray], List[np.ndarray], List[np.ndarray]]:
         """This function is very similar to predict(...), however it is used for batched mode, when the model is expected to generate predictions on multiple images.
         It returns a tuple of lists of masks, ious, and low_res_masks_logits.
+        Each mask_input_batch entry can have shape 1xHxW or Bx1xHxW, with
+        independent prompt batch sizes for each image. See predict for output shapes.
         """
         assert self._is_batch, "This function should only be used when in batched mode"
         if not self._is_image_set:
@@ -256,8 +258,8 @@ class SAM2ImagePredictor:
           box (np.ndarray or None): A length 4 array given a box prompt to the
             model, in XYXY format.
           mask_input (np.ndarray): A low resolution mask input to the model, typically
-            coming from a previous prediction iteration. Has form 1xHxW, where
-            for SAM, H=W=256.
+            coming from a previous prediction iteration. Has form 1xHxW or Bx1xHxW
+            for a batch of mask prompts on the same image, where H=W=256.
           multimask_output (bool): If true, the model will return three masks.
             For ambiguous input prompts (such as a single click), this will often
             produce better masks than a single prediction. If only a single
@@ -276,6 +278,8 @@ class SAM2ImagePredictor:
           (np.ndarray): An array of shape CxHxW, where C is the number
             of masks and H=W=256. These low resolution logits can be passed to
             a subsequent iteration as mask input.
+          For a prompt batch with B>1, each output has an additional leading
+            dimension B: BxCxHxW masks and logits, and BxC quality predictions.
         """
         if not self._is_image_set:
             raise RuntimeError(
@@ -410,9 +414,7 @@ class SAM2ImagePredictor:
         )
 
         # Predict masks
-        batched_mode = (
-            concat_points is not None and concat_points[0].shape[0] > 1
-        )  # multi object prediction
+        batched_mode = sparse_embeddings.shape[0] > 1  # multi object prediction
         high_res_features = [
             feat_level[img_idx].unsqueeze(0)
             for feat_level in self._features["high_res_feats"]

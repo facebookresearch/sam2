@@ -24,8 +24,8 @@ class SAM2VideoPredictor(SAM2Base):
         fill_hole_area=0,
         # whether to apply non-overlapping constraints on the output object masks
         non_overlap_masks=False,
-        # whether to clear non-conditioning memory of the surrounding frames (which may contain outdated information) after adding correction clicks;
-        # note that this would only apply to *single-object tracking* unless `clear_non_cond_mem_for_multi_obj` is also set to True)
+        # whether to clear each object's non-conditioning memory of the surrounding frames
+        # (which may contain outdated information) after adding correction clicks
         clear_non_cond_mem_around_input=False,
         # if `add_all_frames_to_correct_as_cond` is True, we also append to the conditioning frame list any frame that receives a later correction click
         # if `add_all_frames_to_correct_as_cond` is False, we conditioning frame list to only use those initial conditioning frames
@@ -491,6 +491,14 @@ class SAM2VideoPredictor(SAM2Base):
         for obj_idx in range(batch_size):
             obj_output_dict = inference_state["output_dict_per_obj"][obj_idx]
             obj_temp_output_dict = inference_state["temp_output_dict_per_obj"][obj_idx]
+            if self.clear_non_cond_mem_around_input:
+                # Clear stale memories before merging any new outputs, so that
+                # corrections on nearby frames do not erase each other.
+                for storage_key in ["non_cond_frame_outputs", "cond_frame_outputs"]:
+                    for frame_idx in obj_temp_output_dict[storage_key]:
+                        self._clear_obj_non_cond_mem_around_input(
+                            inference_state, frame_idx, obj_idx
+                        )
             for is_cond in [False, True]:
                 # Separately consolidate conditioning and non-conditioning temp outputs
                 storage_key = (
@@ -521,12 +529,6 @@ class SAM2VideoPredictor(SAM2Base):
                         out["maskmem_pos_enc"] = maskmem_pos_enc
 
                     obj_output_dict[storage_key][frame_idx] = out
-                    if self.clear_non_cond_mem_around_input:
-                        # clear non-conditioning memory of the surrounding frames
-                        self._clear_obj_non_cond_mem_around_input(
-                            inference_state, frame_idx, obj_idx
-                        )
-
                 # clear temporary outputs in `temp_output_dict_per_obj`
                 obj_temp_output_dict[storage_key].clear()
 
@@ -953,9 +955,9 @@ class SAM2VideoPredictor(SAM2Base):
 
         return inference_state["obj_ids"], updated_frames
 
-    def _clear_non_cond_mem_around_input(self, inference_state, frame_idx):
+    def _clear_obj_non_cond_mem_around_input(self, inference_state, frame_idx, obj_idx):
         """
-        Remove the non-conditioning memory around the input frame. When users provide
+        Remove an object's non-conditioning memory around the input frame. When users provide
         correction clicks, the surrounding frames' non-conditioning memories can still
         contain outdated object appearance information and could confuse the model.
 
@@ -965,12 +967,10 @@ class SAM2VideoPredictor(SAM2Base):
         r = self.memory_temporal_stride_for_eval
         frame_idx_begin = frame_idx - r * self.num_maskmem
         frame_idx_end = frame_idx + r * self.num_maskmem
-        batch_size = self._get_obj_num(inference_state)
-        for obj_idx in range(batch_size):
-            obj_output_dict = inference_state["output_dict_per_obj"][obj_idx]
-            non_cond_frame_outputs = obj_output_dict["non_cond_frame_outputs"]
-            for t in range(frame_idx_begin, frame_idx_end + 1):
-                non_cond_frame_outputs.pop(t, None)
+        obj_output_dict = inference_state["output_dict_per_obj"][obj_idx]
+        non_cond_frame_outputs = obj_output_dict["non_cond_frame_outputs"]
+        for t in range(frame_idx_begin, frame_idx_end + 1):
+            non_cond_frame_outputs.pop(t, None)
 
 
 class SAM2VideoPredictorVOS(SAM2VideoPredictor):

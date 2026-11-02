@@ -1,5 +1,19 @@
 # SAM 2: Segment Anything in Images and Videos
 
+**Community-maintained fork with native Apple Silicon / MPS inference support.**
+
+This fork of [Meta's SAM 2](https://github.com/facebookresearch/sam2) keeps the
+original models and checkpoints while updating PyTorch for native Apple GPU
+execution. PyTorch 2.14.1+ and matching TorchVision 0.29.1+ support Hiera's MPS
+pooling and bicubic interpolation directly. Builders automatically select
+CUDA, then MPS, then CPU, with explicit device overrides.
+
+See [Apple Silicon setup](INSTALL.md#apple-silicon-macos) and the
+[measured inference qualification](docs/apple-silicon.md) for installation,
+CPU/MPS mask agreement, memory checks and remaining validation limits. Training
+remains a separate CUDA/CPU workflow. Original research and model credit belong
+to the authors below; this fork retains their license and attribution.
+
 **[AI at Meta, FAIR](https://ai.meta.com/research/)**
 
 [Nikhila Ravi](https://nikhilaravi.com/), [Valentin Gabeur](https://gabeur.github.io/), [Yuan-Ting Hu](https://scholar.google.com/citations?user=E8DVVYQAAAAJ&hl=en), [Ronghang Hu](https://ronghanghu.com/), [Chaitanya Ryali](https://scholar.google.com/citations?user=4LWx24UAAAAJ&hl=en), [Tengyu Ma](https://scholar.google.com/citations?user=VeTSl0wAAAAJ&hl=en), [Haitham Khedr](https://hkhedr.com/), [Roman Rädle](https://scholar.google.de/citations?user=Tpt57v0AAAAJ&hl=en), [Chloe Rolland](https://scholar.google.com/citations?hl=fr&user=n-SnMhoAAAAJ), [Laura Gustafson](https://scholar.google.com/citations?user=c8IpF9gAAAAJ&hl=en), [Eric Mintun](https://ericmintun.github.io/), [Junting Pan](https://junting.github.io/), [Kalyan Vasudev Alwala](https://scholar.google.co.in/citations?user=m34oaWEAAAAJ&hl=en), [Nicolas Carion](https://www.nicolascarion.com/), [Chao-Yuan Wu](https://chaoyuan.org/), [Ross Girshick](https://www.rossgirshick.info/), [Piotr Dollár](https://pdollar.github.io/), [Christoph Feichtenhofer](https://feichtenhofer.github.io/)
@@ -13,6 +27,13 @@
 ![SA-V dataset](assets/sa_v_dataset.jpg?raw=true)
 
 ## Latest updates
+
+**2026-11-02 -- community fork and Apple Silicon support**
+
+- Native PyTorch MPS inference for image prompts, automatic masks and multi-object
+  video, with portable mask cleanup and MP4 decoding.
+- Fork-owned Linux/macOS CI covers the minimum and current PyTorch versions,
+  checkpoint loading, packaging and a real-checkpoint CPU regression workload.
 
 **12/11/2024 -- full model compilation for a major VOS speedup and a new `SAM2VideoPredictor` to better handle multi-object tracking**
 
@@ -32,7 +53,7 @@
 SAM 2 needs to be installed first before use. The code requires `python>=3.10`, as well as `torch>=2.14.1` and `torchvision>=0.29.1`. Please follow the instructions [here](https://pytorch.org/get-started/locally/) to install matching PyTorch and TorchVision dependencies together. You can install SAM 2 on Linux or an Apple Silicon Mac using:
 
 ```bash
-git clone https://github.com/facebookresearch/sam2.git && cd sam2
+git clone https://github.com/sealad886/sam2.git && cd sam2
 
 pip install -e .
 ```

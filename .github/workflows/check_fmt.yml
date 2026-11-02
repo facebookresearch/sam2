@@ -1,17 +1,28 @@
-name: SAM2/fmt
+name: Formatting
+
 on:
   pull_request:
-    branches:
-    - main
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ufmt_check:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - name: Check formatting
-        uses: omnilib/ufmt@action-v1
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          path: sam2 tools
-          version: "2.0.0b2"
-          python-version: "3.10"
-          black-version: "24.2.0"
-          usort-version: "1.0.2"
+          python-version: '3.12'
+      - name: Install formatting tools
+        run: python -m pip install black==24.2.0 usort==1.0.2 ufmt==2.0.0b2
+      - name: Check Python formatting
+        run: python -m ufmt check sam2 training tools tests setup.py

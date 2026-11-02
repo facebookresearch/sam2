@@ -2,13 +2,16 @@ name: Inference portability
 
 on:
   pull_request:
-    branches: [main]
   push:
     branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   contracts:
@@ -42,11 +45,7 @@ jobs:
           python -m pip install setuptools wheel
           python -m pip install --no-build-isolation -e '.[dev]' pytest 'av>=13.0.0'
       - name: Run inference contracts
-        run: python -m pytest -q tests
-      - name: Check formatting
-        run: |
-          python -m pip install black==24.2.0 usort==1.0.2 ufmt==2.0.0b2
-          python -m ufmt check sam2 training tools tests setup.py
+        run: env -u PYTORCH_ENABLE_MPS_FALLBACK python -m pytest -q tests
 
   cpu-checkpoint:
     runs-on: ubuntu-latest
@@ -71,3 +70,30 @@ jobs:
           OMP_NUM_THREADS: '2'
           MKL_NUM_THREADS: '2'
         run: python -m tools.validate_inference --device cpu --reference-device cpu
+      - name: Verify installed wheel outside the checkout
+        env:
+          SAM2_BUILD_CUDA: '0'
+          SAM2_BUILD_ALLOW_ERRORS: '0'
+          SAM2_CHECKPOINT: ${{ github.workspace }}/checkpoints/sam2.1_hiera_tiny.pt
+        run: |
+          python -m pip wheel --no-deps --no-build-isolation . --wheel-dir "$RUNNER_TEMP/sam2-wheel"
+          python -m pip install --force-reinstall --no-deps "$RUNNER_TEMP"/sam2-wheel/*.whl
+          cd "$RUNNER_TEMP"
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          import sam2
+          import torch
+          from sam2.build_sam import build_sam2
+          from sam2.utils.misc import get_connected_components
+          from torchvision.ops import nms
+
+          assert not Path(sam2.__file__).resolve().is_relative_to(Path(os.environ["GITHUB_WORKSPACE"]).resolve())
+          model = build_sam2("configs/sam2.1/sam2.1_hiera_t.yaml", os.environ["SAM2_CHECKPOINT"], device="cpu")
+          assert model.device.type == "cpu"
+          _, areas = get_connected_components(torch.tensor([[[[1, 0], [0, 1]]]], dtype=torch.uint8))
+          assert areas[0, 0, 0, 0].item() == areas[0, 0, 1, 1].item() == 2
+          assert nms(torch.tensor([[0., 0., 10., 10.], [1., 1., 9., 9.]]), torch.tensor([.9, .8]), .5).tolist() == [0]
+          print("Installed wheel config, checkpoint, cleanup and native TorchVision NMS passed")
+          PY

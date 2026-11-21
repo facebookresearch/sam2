@@ -157,6 +157,8 @@ class AsyncVideoFrameLoader:
         )
         self.video_height = video_height
         self.video_width = video_width
+        # _load_img_as_tensor gives float64; match the eager loader (MPS has no float64)
+        img = img.float()
         # normalize by mean and std
         img -= self.img_mean
         img /= self.img_std

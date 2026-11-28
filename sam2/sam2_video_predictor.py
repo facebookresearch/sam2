@@ -786,7 +786,11 @@ class SAM2VideoPredictor(SAM2Base):
             pred_masks_gpu = fill_holes_in_mask_scores(
                 pred_masks_gpu, self.fill_hole_area
             )
-        pred_masks = pred_masks_gpu.to(storage_device, non_blocking=True)
+        # Callers may immediately copy CPU-stored masks back to the GPU during
+        # prompt consolidation. Wait until the host copy is ready before returning.
+        pred_masks = pred_masks_gpu.to(
+            storage_device, non_blocking=storage_device.type != "cpu"
+        )
         # "maskmem_pos_enc" is the same across frames, so we only need to store one copy of it
         maskmem_pos_enc = self._get_maskmem_pos_enc(inference_state, current_out)
         # object pointer is a small tensor, so we always keep it on GPU memory for fast access
